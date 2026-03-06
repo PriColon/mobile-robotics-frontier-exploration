@@ -1,0 +1,6 @@
+title: "Autonomous Frontier Exploration"
+description: "Mobile Robotics · ASU Spring 2026"
+remote_theme: just-the-docs/just-the-docs
+search_enabled: true
+plugins:
+  - jekyll-remote-theme
