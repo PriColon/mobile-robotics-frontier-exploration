@@ -8,7 +8,7 @@ nav_order: 1
 # Autonomous Frontier Exploration with Semantic Hazard Mapping
 
 **Course:** Mobile Robotics — Arizona State University, Spring 2026  
-**Team:** [Team Member 1] · [Team Member 2] · [Team Member 3]  
+**Team:** Rohit Mane · Princess Colon · Manjunath  
 **Repository:** [https://github.com/PriColon/mobile-robotics-frontier-exploration](https://github.com/PriColon/mobile-robotics-frontier-exploration)
 
 ---
