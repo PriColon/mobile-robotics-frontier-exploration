@@ -3,23 +3,18 @@ description: "Mobile Robotics · ASU Spring 2026"
 
 remote_theme: just-the-docs/just-the-docs
 
-# JTD basics
+# Theme behavior
 color_scheme: light
 search_enabled: true
 heading_anchors: true
-
-# Make it feel like “real docs”
 back_to_top: true
 back_to_top_text: "Back to top"
 
-# Top-right link like ROS docs
+# Top-right link
 aux_links:
   "GitHub Repository":
     - "https://github.com/PriColon/mobile-robotics-frontier-exploration"
 aux_links_new_tab: true
-
-# Footer (optional)
-footer_content: "Mobile Robotics — ASU Spring 2026"
 
 plugins:
   - jekyll-remote-theme

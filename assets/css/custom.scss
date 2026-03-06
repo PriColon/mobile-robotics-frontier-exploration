@@ -1,8 +1,9 @@
 /* ==========================================================================
    ROS / ReadTheDocs-ish styling for Just the Docs
+   + Fix sidebar title overlapping top bar
    ========================================================================== */
 
-/* Accent color similar to RTD / ROS docs */
+/* Accent colors + surfaces */
 :root {
   --link-color: #2980b9;
   --btn-primary-color: #2980b9;
@@ -11,27 +12,62 @@
   --body-background-color: #ffffff;
 
   --border-color: #e5e7eb;
-
-  /* Subtle text tweaks */
   --body-text-color: #1f2937;
 }
 
-/* Sidebar: light gray, subtle border */
+/* Sidebar container */
 .side-bar {
   background-color: var(--sidebar-color);
   border-right: 1px solid var(--border-color);
+
+  /* Important: creates breathing room at the top so long titles don't crash into header area */
+  padding-top: 0.75rem;
 }
 
-/* Make nav items feel crisp */
-.nav-list .nav-list-item .nav-list-link {
-  padding-top: 0.35rem;
-  padding-bottom: 0.35rem;
+/* Sidebar site title block (THIS fixes your overlap) */
+.site-title {
+  display: block;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.25;
+
+  /* Space around the title so it doesn't collide with the top region */
+  padding: 0.75rem 0.75rem;
+
+  /* Prevent weird overflow when it wraps */
+  white-space: normal;
+  word-break: break-word;
 }
 
-/* Search bar: more docs-like */
+/* Make the title link behave nicely */
+.site-title a {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Top search/header area separation (more ROS-like) */
+.search {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+/* Search input styling */
 .search-input {
   border: 1px solid var(--border-color);
   border-radius: 6px;
+}
+
+/* Nav spacing (ROS-like) */
+.nav-list .nav-list-item .nav-list-link {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+  padding-left: 0.9rem;
+  padding-right: 0.9rem;
+}
+
+/* Stronger active section cue */
+.nav-list .nav-list-item.active > .nav-list-link {
+  font-weight: 600;
 }
 
 /* Main content typography */
@@ -40,7 +76,7 @@
   line-height: 1.65;
 }
 
-/* Headings spacing similar to RTD */
+/* Headings spacing */
 h1 {
   margin-bottom: 0.75rem;
 }
@@ -51,20 +87,21 @@ h2, h3 {
 /* Wider content like ROS docs */
 @media (min-width: 66.5rem) {
   .main {
-    max-width: 58rem;
+    max-width: 60rem;
   }
 }
 
-/* Code: RTD-ish */
+/* Code blocks */
 code, pre {
   font-size: 0.95em;
 }
 pre {
   border: 1px solid var(--border-color);
   border-radius: 6px;
+  overflow-x: auto;
 }
 
-/* Tables: clean + readable (helps your milestone table) */
+/* Tables */
 table {
   border: 1px solid var(--border-color);
   border-collapse: collapse;
@@ -76,19 +113,12 @@ table th {
   background: #f3f4f6;
 }
 
-/* Admonitions in JTD markdown style:
-   {: .note } ... / {: .warning } ...
-*/
+/* Admonitions (JTD markdown blocks) */
 .note, .warning, .important {
   border-radius: 6px;
 }
 
-/* Mermaid diagrams: keep them from overflowing */
+/* Mermaid diagrams */
 .mermaid {
   overflow-x: auto;
-}
-
-/* Make the site title area slightly more “docs” */
-.site-title {
-  font-weight: 700;
 }
