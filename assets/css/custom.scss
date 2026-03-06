@@ -1,21 +1,94 @@
----
----
+/* ==========================================================================
+   ROS / ReadTheDocs-ish styling for Just the Docs
+   ========================================================================== */
 
-// Full width layout
-.main {
-  max-width: 100% !important;
+/* Accent color similar to RTD / ROS docs */
+:root {
+  --link-color: #2980b9;
+  --btn-primary-color: #2980b9;
+
+  --sidebar-color: #f8f9fa;
+  --body-background-color: #ffffff;
+
+  --border-color: #e5e7eb;
+
+  /* Subtle text tweaks */
+  --body-text-color: #1f2937;
 }
 
-.main-content-wrap {
-  max-width: 100% !important;
-  padding-left: 2rem;
-  padding-right: 2rem;
+/* Sidebar: light gray, subtle border */
+.side-bar {
+  background-color: var(--sidebar-color);
+  border-right: 1px solid var(--border-color);
 }
 
-// Responsive mobile
-@media (max-width: 800px) {
-  .main-content-wrap {
-    padding-left: 1rem;
-    padding-right: 1rem;
+/* Make nav items feel crisp */
+.nav-list .nav-list-item .nav-list-link {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+}
+
+/* Search bar: more docs-like */
+.search-input {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+/* Main content typography */
+.main-content {
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+/* Headings spacing similar to RTD */
+h1 {
+  margin-bottom: 0.75rem;
+}
+h2, h3 {
+  margin-top: 1.75rem;
+}
+
+/* Wider content like ROS docs */
+@media (min-width: 66.5rem) {
+  .main {
+    max-width: 58rem;
   }
+}
+
+/* Code: RTD-ish */
+code, pre {
+  font-size: 0.95em;
+}
+pre {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+/* Tables: clean + readable (helps your milestone table) */
+table {
+  border: 1px solid var(--border-color);
+  border-collapse: collapse;
+}
+table th, table td {
+  border-bottom: 1px solid var(--border-color);
+}
+table th {
+  background: #f3f4f6;
+}
+
+/* Admonitions in JTD markdown style:
+   {: .note } ... / {: .warning } ...
+*/
+.note, .warning, .important {
+  border-radius: 6px;
+}
+
+/* Mermaid diagrams: keep them from overflowing */
+.mermaid {
+  overflow-x: auto;
+}
+
+/* Make the site title area slightly more “docs” */
+.site-title {
+  font-weight: 700;
 }

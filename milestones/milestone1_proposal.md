@@ -9,7 +9,7 @@ nav_order: 1
 
 **Course:** Mobile Robotics — Arizona State University, Spring 2026  
 **Team:** [Team Member 1] · [Team Member 2] · [Team Member 3]  
-**Repository:** [https://github.com/your-team/tb4-frontier-exploration](https://github.com/)
+**Repository:** [https://github.com/PriColon/mobile-robotics-frontier-exploration](https://github.com/PriColon/mobile-robotics-frontier-exploration)
 
 ---
 
@@ -53,6 +53,8 @@ v = (v_r + v_l) / 2         (linear velocity)
 
 The system follows the **Perception → Estimation → Planning → Actuation** pipeline. A reactive bypass allows the behavior coordinator to receive direct semantic feedback from the perception layer, enabling hazard-aware goal selection independently of map update speed.
 
+{: .note }
+Architecture diagram rendered with Mermaid (similar to how many ROS project docs embed diagrams).
 ```mermaid
 flowchart TD
     subgraph Perception
@@ -158,7 +160,7 @@ During all real-robot tests, one team member must remain physically present with
 
 ## Git Infrastructure
 
-**Team Repository:** [https://github.com/your-team/tb4-frontier-exploration](https://github.com/)  
+**Team Repository:** [https://github.com/PriColon/mobile-robotics-frontier-exploration](https://github.com/PriColon/mobile-robotics-frontier-exploration)
 *(All three teammates added as members with write access)*
 
 **Individual Site Repository with Submodule:**  

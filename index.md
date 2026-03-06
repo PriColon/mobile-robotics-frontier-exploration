@@ -10,13 +10,12 @@ nav_order: 1
 **Team:** Princess Colon · Rohit Mane · Manjunath Kondamu  
 **Repository:** [PriColon/mobile-robotics-frontier-exploration](https://github.com/PriColon/mobile-robotics-frontier-exploration)
 
----
+{: .note }
+This site is styled to resemble ROS / ReadTheDocs-style documentation while staying on Jekyll + Just the Docs.
 
 ## Mission Statement
 
 Our robot autonomously explores a completely unknown indoor environment — building a live occupancy map and semantically classifying regions as clear, cluttered, or hazardous using its onboard RGB-D camera. No prior map. No human guidance.
-
----
 
 ## Milestones
 
