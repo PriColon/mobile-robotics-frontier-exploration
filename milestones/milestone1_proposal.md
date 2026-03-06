@@ -53,35 +53,8 @@ v = (v_r + v_l) / 2         (linear velocity)
 
 The system follows the **Perception → Estimation → Planning → Actuation** pipeline. A reactive bypass allows the behavior coordinator to receive direct semantic feedback from the perception layer, enabling hazard-aware goal selection independently of map update speed.
 
-{: .note }
-Architecture diagram rendered with Mermaid (similar to how many ROS project docs embed diagrams).
-```mermaid
-flowchart TD
-    subgraph Perception
-        A[LiDAR Driver\nrplidar_ros2] --> |/scan| C
-        B[OAK-D Camera Driver\ndepthai_ros] --> |/oakd/rgb, /oakd/stereo| D[Semantic Hazard\nClassifier CUSTOM]
-    end
+![System Architecture Diagram](/mobile-robotics-frontier-exploration/assets/images/architecture.png)
 
-    subgraph Estimation
-        C[SLAM Toolbox\nLIBRARY] --> |/map| E
-        C --> |/tf map→odom| F
-        F[Robot Localization EKF\nLIBRARY] --> |/odometry/filtered| E
-        G[/odom + /imu] --> F
-    end
-
-    subgraph Planning
-        E[Frontier Explorer\nCUSTOM] --> |/frontier_goals| H
-        D --> |/semantic_map| H
-        H[Behavior Coordinator\nCUSTOM] --> |/goal_pose| I[Nav2 Global Planner\nLIBRARY]
-    end
-
-    subgraph Actuation
-        I --> |/cmd_vel| J[Diff-Drive Controller\nLIBRARY]
-        J --> K[Create3 Motor Hardware]
-    end
-
-    D -.->|Reactive Bypass\nhazard feedback| H
-```
 
 ---
 
