@@ -1,0 +1,31 @@
+---
+---
+
+@import "{{ site.theme }}";
+
+// Full width layout — remove the narrow center column
+.side-bar {
+  width: 248px;
+  min-width: 248px;
+}
+
+.main {
+  max-width: 100%;
+}
+
+.main-content-wrap {
+  max-width: 100%;
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+// Responsive — on mobile, full width
+@media (max-width: 800px) {
+  .side-bar {
+    width: 100%;
+  }
+  .main-content-wrap {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
