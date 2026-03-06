@@ -1,3 +1,3 @@
 # Index
 
-[Milestone 1] (milestone1_proposal.md)
+[Milestone 1](milestone1_proposal.md)
