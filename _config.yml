@@ -20,3 +20,9 @@ plugins:
   - jekyll-remote-theme
   - jekyll-include-cache
 repository: PriColon/mobile-robotics-frontier-exploration
+
+exclude:
+  - sphinx/
+  - Documentation/
+  - README.md
+  - Gemfile.lock
