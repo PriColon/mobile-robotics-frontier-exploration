@@ -370,6 +370,7 @@ def classify_color(self, rgb):
 
 Replace TODO with:
 
+
 pts_box, colors_box = self.pipeline.box_filter(pts, raw_colors)
 
 pts_v, colors_v = self.pipeline.downsample(pts_box, colors_box)
@@ -395,15 +396,12 @@ for cluster in clusters:
     cluster_colors = colors_objects[cluster]
     normals_cluster = self.pipeline.estimate_normals(cluster_pts)
     model, inliers = self.pipeline.find_single_cylinder(cluster_pts, normals_cluster)
-
     if model is None:
         continue
-    
     avg_color = cluster_colors.mean(axis=0)
-    
     label = self.pipeline.classify_color(avg_color)
-    
     detected_cylinders.append((model, avg_color, label))
+
 
 **9. Expected Output in RViz**
 
