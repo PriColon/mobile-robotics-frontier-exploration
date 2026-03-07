@@ -138,7 +138,7 @@ Removes points outside a 3D workspace box.
 **CODE**
 
 def box_filter(self, pts, colors):
-    
+
     mask = np.all((pts >= self.cfg.box_min) & (pts <= self.cfg.box_max), axis=1)
 
     filtered_pts = pts[mask]
@@ -161,9 +161,13 @@ Convert points to voxel indices then keep one point per voxel.
 **CODE**
 
 def downsample(self, pts, colors):
+
     voxel = self.cfg.voxel_size
+
     voxel_idx = np.floor(pts / voxel).astype(np.int32)
+    
     unique_voxels, unique_indices = np.unique(voxel_idx, axis=0, return_index=True)
+    
     return pts[unique_indices], colors[unique_indices]
 
 **Explanation**
@@ -185,18 +189,26 @@ np.unique ensures one point per voxel.
 **CODE**
 
 def estimate_normals(self, pts, k=15):
+    
     idxs = self.get_neighbors(pts, pts, k)
+    
     normals = np.zeros_like(pts)
+    
     for i in range(len(pts)):
+    
         neighbors = pts[idxs[i]]
+        
         centered = neighbors - neighbors.mean(axis=0)
+        
         U, S, Vt = np.linalg.svd(centered)
+        
         normal = Vt[-1]
+        
         normals[i] = normal / np.linalg.norm(normal)
+    
     return normals
 
-Mathematically
-
+*Mathematically*
 SVD decomposition:
 
 𝑋 = 𝑈Σ𝑉^𝑇
@@ -215,28 +227,43 @@ ax+by+cz+d=0
 d = ∣ax+by+cz+d∣ / sqrt (a^2+b^2+c^2)
 
 *Implementation:*
+
 def find_plane_ransac(self, pts, iters=100):
+
     best_inliers = []
+    
     best_model = None
+    
     N = len(pts)
+    
     for _ in range(iters):
+    
         sample_idx = np.random.choice(N, 3, replace=False)
+        
         p1, p2, p3 = pts[sample_idx]
+        
         v1 = p2 - p1
+        
         v2 = p3 - p1
+        
         normal = np.cross(v1, v2)
+        
         if np.linalg.norm(normal) == 0:
+        
             continue
         normal = normal / np.linalg.norm(normal)
         # Check alignment with expected floor normal
         if np.abs(np.dot(normal, self.cfg.target_normal)) < self.cfg.normal_thresh:
             continue
+        
         d = -np.dot(normal, p1)
         distances = np.abs(pts @ normal + d)
         inliers = np.where(distances < self.cfg.floor_dist)[0]
+        
         if len(inliers) > len(best_inliers):
             best_inliers = inliers
             best_model = (normal, d)
+    
     return best_model, best_inliers
 
 **5. Euclidean Clustering**
@@ -244,25 +271,33 @@ def find_plane_ransac(self, pts, iters=100):
 Cluster points based on spatial proximity.
 
 def euclidean_clusters(self, pts, dist_thresh=0.1):
+    
     tree = cKDTree(pts)
+    
     visited = np.zeros(len(pts), dtype=bool)
+    
     clusters = []
+    
     for i in range(len(pts)):
         if visited[i]:
             continue
         queue = [i]
         cluster = []
+    
         while queue:
             idx = queue.pop()
             if visited[idx]:
                 continue
+        
             visited[idx] = True
             cluster.append(idx)
             neighbors = tree.query_ball_point(pts[idx], dist_thresh)
+            
             for n in neighbors:
                 if not visited[n]:
                     queue.append(n)
         clusters.append(np.array(cluster))
+    
     return clusters
 
 **6. Cylinder RANSAC**
@@ -278,10 +313,15 @@ axis= n1 × n2
 d=∥(p−c)−((p−c)⋅a)a∥
 
 *Implementation:*
+
 def find_single_cylinder(self, pts, normals, iters=300):
+
     best_inliers = []
+    
     best_model = None
+    
     N = len(pts)
+    
     for _ in range(iters):
         idx = np.random.choice(N, 2, replace=False)
         p1, p2 = pts[idx]
@@ -290,6 +330,7 @@ def find_single_cylinder(self, pts, normals, iters=300):
         if np.linalg.norm(axis) < 1e-6:
             continue
         axis = axis / np.linalg.norm(axis)
+    
         # enforce vertical axis
         if np.abs(axis[1]) < 0.8:
             continue
@@ -299,6 +340,7 @@ def find_single_cylinder(self, pts, normals, iters=300):
         closest = center + np.outer(proj, axis)
         dist = np.linalg.norm(pts - closest, axis=1)
         inliers = np.where(np.abs(dist - self.cfg.cyl_radius) < 0.02)[0]
+        
         if len(inliers) > len(best_inliers):
             best_inliers = inliers
             best_model = (center, axis, self.cfg.cyl_radius)
@@ -309,14 +351,19 @@ Example thresholds.
 
 def classify_color(self, rgb):
     h, s, v = self.rgb_to_hsv(rgb[0], rgb[1], rgb[2])
+
     if h < 20 or h > 340:
         return "red"
+    
     if 80 < h < 160:
         return "green"
+    
     if 200 < h < 260:
         return "blue"
+    
     if 300 < h < 340:
         return "pink"
+    
     return "unknown"
 
 **8. Complete Pipeline Flow (Callback)**
@@ -324,24 +371,38 @@ def classify_color(self, rgb):
 Replace TODO with:
 
 pts_box, colors_box = self.pipeline.box_filter(pts, raw_colors)
+
 pts_v, colors_v = self.pipeline.downsample(pts_box, colors_box)
+
 normals = self.pipeline.estimate_normals(pts_v)
+
 plane_model, plane_inliers = self.pipeline.find_plane_ransac(pts_v)
+
 mask = np.ones(len(pts_v), dtype=bool)
+
 mask[plane_inliers] = False
+
 pts_objects = pts_v[mask]
+
 colors_objects = colors_v[mask]
+
 clusters = self.pipeline.euclidean_clusters(pts_objects)
+
 detected_cylinders = []
+
 for cluster in clusters:
     cluster_pts = pts_objects[cluster]
     cluster_colors = colors_objects[cluster]
     normals_cluster = self.pipeline.estimate_normals(cluster_pts)
     model, inliers = self.pipeline.find_single_cylinder(cluster_pts, normals_cluster)
+
     if model is None:
         continue
+    
     avg_color = cluster_colors.mean(axis=0)
+    
     label = self.pipeline.classify_color(avg_color)
+    
     detected_cylinders.append((model, avg_color, label))
 
 **9. Expected Output in RViz**
