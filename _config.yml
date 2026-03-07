@@ -26,3 +26,9 @@ exclude:
   - Documentation/
   - README.md
   - Gemfile.lock
+
+exclude:
+  - sphinx/
+  - Documentation/
+  - README.md
+  - Gemfile.lock
