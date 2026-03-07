@@ -39,4 +39,5 @@ Our robot autonomously explores a completely unknown indoor environment — buil
 ## Quick Links
 
 - [Milestone 1 — Full Proposal](milestones/milestone1_proposal)
+- [Team & Live Stats](team)
 - [GitHub Repository](https://github.com/PriColon/mobile-robotics-frontier-exploration)
