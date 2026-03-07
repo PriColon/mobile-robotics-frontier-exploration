@@ -3,14 +3,12 @@ description: "Mobile Robotics · ASU Spring 2026"
 
 remote_theme: just-the-docs/just-the-docs
 
-# Theme behavior
 color_scheme: light
 search_enabled: true
 heading_anchors: true
 back_to_top: true
 back_to_top_text: "Back to top"
 
-# Top-right link
 aux_links:
   "GitHub Repository":
     - "https://github.com/PriColon/mobile-robotics-frontier-exploration"
@@ -19,16 +17,13 @@ aux_links_new_tab: true
 plugins:
   - jekyll-remote-theme
   - jekyll-include-cache
+
 repository: PriColon/mobile-robotics-frontier-exploration
 
 exclude:
   - sphinx/
   - Documentation/
+  - vendor/
   - README.md
   - Gemfile.lock
-
-exclude:
-  - sphinx/
-  - Documentation/
-  - README.md
-  - Gemfile.lock
+  - "*.sh"
