@@ -370,27 +370,16 @@ def classify_color(self, rgb):
 
 Replace TODO with:
 
-
 pts_box, colors_box = self.pipeline.box_filter(pts, raw_colors)
-
 pts_v, colors_v = self.pipeline.downsample(pts_box, colors_box)
-
 normals = self.pipeline.estimate_normals(pts_v)
-
 plane_model, plane_inliers = self.pipeline.find_plane_ransac(pts_v)
-
 mask = np.ones(len(pts_v), dtype=bool)
-
 mask[plane_inliers] = False
-
 pts_objects = pts_v[mask]
-
 colors_objects = colors_v[mask]
-
 clusters = self.pipeline.euclidean_clusters(pts_objects)
-
 detected_cylinders = []
-
 for cluster in clusters:
     cluster_pts = pts_objects[cluster]
     cluster_colors = colors_objects[cluster]
@@ -401,7 +390,6 @@ for cluster in clusters:
     avg_color = cluster_colors.mean(axis=0)
     label = self.pipeline.classify_color(avg_color)
     detected_cylinders.append((model, avg_color, label))
-
 
 **9. Expected Output in RViz**
 
