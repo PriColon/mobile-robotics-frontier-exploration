@@ -8,7 +8,7 @@ nav_order: 1
 # Autonomous Frontier Exploration with Semantic Hazard Mapping
 
 **Course:** Mobile Robotics — Arizona State University, Spring 2026  
-**Team:** [Team Member 1] · [Team Member 2] · [Team Member 3]  
+**Team:** Princess Colon · Manjunath Kondamu · Rohit Mane  
 **Repository:** [https://github.com/PriColon/mobile-robotics-frontier-exploration](https://github.com/PriColon/mobile-robotics-frontier-exploration)
 
 ---
@@ -27,7 +27,7 @@ Our robot is designed to autonomously explore a completely unknown indoor enviro
 
 ## Technical Specifications
 
-**Robot Platform:** TurtleBot4 Standard — iRobot Create3 base with Raspberry Pi 4 (4GB) compute board
+**Robot Platform:** TurtleBot4 Lite — iRobot Create3 base with Raspberry Pi 4 (4GB) compute board
 
 **Kinematic Model:** Differential Drive — two independently driven wheels with a passive caster. The robot turns by varying the relative speed of the left and right wheels. This model is described by:
 
@@ -51,37 +51,9 @@ v = (v_r + v_l) / 2         (linear velocity)
 
 ## High-Level System Architecture
 
-The system follows the **Perception → Estimation → Planning → Actuation** pipeline. A reactive bypass allows the behavior coordinator to receive direct semantic feedback from the perception layer, enabling hazard-aware goal selection independently of map update speed.
+The system follows the **Perception -> Estimation -> Planning -> Actuation** pipeline. A reactive bypass allows the behavior coordinator to receive direct semantic feedback from the perception layer, enabling hazard-aware goal selection independently of map update speed.
 
-{: .note }
-Architecture diagram rendered with Mermaid (similar to how many ROS project docs embed diagrams).
-```mermaid
-flowchart TD
-    subgraph Perception
-        A[LiDAR Driver\nrplidar_ros2] --> |/scan| C
-        B[OAK-D Camera Driver\ndepthai_ros] --> |/oakd/rgb, /oakd/stereo| D[Semantic Hazard\nClassifier CUSTOM]
-    end
-
-    subgraph Estimation
-        C[SLAM Toolbox\nLIBRARY] --> |/map| E
-        C --> |/tf map→odom| F
-        F[Robot Localization EKF\nLIBRARY] --> |/odometry/filtered| E
-        G[/odom + /imu] --> F
-    end
-
-    subgraph Planning
-        E[Frontier Explorer\nCUSTOM] --> |/frontier_goals| H
-        D --> |/semantic_map| H
-        H[Behavior Coordinator\nCUSTOM] --> |/goal_pose| I[Nav2 Global Planner\nLIBRARY]
-    end
-
-    subgraph Actuation
-        I --> |/cmd_vel| J[Diff-Drive Controller\nLIBRARY]
-        J --> K[Create3 Motor Hardware]
-    end
-
-    D -.->|Reactive Bypass\nhazard feedback| H
-```
+![mermaid diagram](../assets/images/architecture.png)
 
 ---
 
@@ -106,7 +78,7 @@ flowchart TD
 ### Library Modules
 
 **SLAM Toolbox**  
-We will use `slam_toolbox` in asynchronous mode (`async_slam_toolbox_node`) to generate a live 2D occupancy grid from the RPLIDAR A1M8 scan data. The key configuration parameters we will tune are: `resolution` (0.05m per cell — balancing detail with computational cost), `minimum_travel_distance` and `minimum_travel_heading` (controlling how frequently the map updates to prevent overloading the Pi), and `scan_buffer_maximum_scan_queue_size` to manage the LiDAR scan rate. SLAM Toolbox was chosen over RTAB-Map for 2D environments because it has lower CPU overhead, which is important given the Raspberry Pi 4's constraints, and its map-saving and map-loading features directly support our re-localization needs.
+We will use `slam_toolbox` in asynchronous mode (`async_slam_toolbox_node`) to generate a live 2D occupancy grid from the RPLIDAR scan data. The key configuration parameters we will tune are: `resolution` (0.05m per cell — balancing detail with computational cost), `minimum_travel_distance` and `minimum_travel_heading` (controlling how frequently the map updates to prevent overloading the Pi), and `scan_buffer_maximum_scan_queue_size` to manage the LiDAR scan rate. SLAM Toolbox was chosen over RTAB-Map for 2D environments because it has lower CPU overhead, which is important given the Raspberry Pi 4's constraints, and its map-saving and map-loading features directly support our re-localization needs.
 
 **Robot Localization EKF**  
 We will use the `robot_localization` package to implement an Extended Kalman Filter that fuses wheel encoder odometry (`/odom` at 20Hz) with the Create3's built-in IMU (`/imu` at 100Hz) and the OAK-D's secondary IMU (`/oakd/imu/data`). This is necessary because wheel encoders alone drift over time — particularly on smooth lab floors where minor slippage accumulates into significant positional error. We will configure the EKF in 2D mode (estimating x, y, yaw only) and tune the per-sensor covariance matrices so that the IMU dominates orientation estimation while odometry dominates position. The output `/odometry/filtered` topic provides SLAM Toolbox with a stable `odom → base_link` transform.
@@ -177,5 +149,3 @@ person-c/coord    ← Person C: behavior coordinator + launch files
 **README:** A `README.md` at the repository root mirrors this mission statement and contains setup and launch instructions.
 
 ---
-
-*Word count: ~1,480 words*
