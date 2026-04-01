@@ -22,5 +22,5 @@ Our robot autonomously explores a completely unknown indoor environment — buil
 | # | Title | Status |
 |---|---|---|
 | [Milestone 1](milestones/milestone1_proposal) | Proposal & Architecture | ✅ Submitted |
-| Milestone 2 | Implementation | 🔄 Upcoming |
+| [Milestone 2](milestones/milestrone2_technicalproof) | Implementation | 🔄 Upcoming |
 | Milestone 3 | Final Demo | 🔄 Upcoming |
