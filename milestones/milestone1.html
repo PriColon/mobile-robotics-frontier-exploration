@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Milestone 1 — Proposal & Architecture · AFE · ASU</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --maroon:#8C1D40;--maroon-dark:#6B1530;--maroon-light:#B5244E;
+  --gold:#FFC627;--gold-dark:#E0A800;
+  --white:#FFFFFF;--off-white:#FAFAF8;
+  --gray-50:#F7F6F3;--gray-100:#EDEBE5;--gray-200:#D5D2C8;
+  --gray-600:#5C5750;--text:#1A1814;--text-muted:#6B6560;--border:#E0DDD5;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.04);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.10);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:"Source Sans 3",sans-serif;background:var(--off-white);color:var(--text);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased;}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(140,29,64,0.97);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,198,39,0.25);padding:0 2rem;height:56px;display:flex;align-items:center;justify-content:space-between;}
+.nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.nav-logo{width:30px;height:30px;background:var(--gold);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:"Playfair Display",serif;font-size:13px;font-weight:700;color:var(--maroon);}
+.nav-title{font-size:13px;font-weight:600;color:rgba(255,255,255,0.9);}
+.nav-back{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.75);text-decoration:none;padding:0 14px;height:56px;letter-spacing:0.04em;text-transform:uppercase;transition:color 0.2s;}
+.nav-back:hover{color:var(--gold);}
+
+/* PAGE HERO */
+.page-hero{background:var(--maroon);padding:100px 2rem 52px;position:relative;overflow:hidden;}
+.page-hero::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 120%,rgba(255,198,39,0.12) 0%,transparent 70%);}
+.page-hero-grid{position:absolute;inset:0;opacity:0.04;background-image:linear-gradient(rgba(255,255,255,0.5) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.5) 1px,transparent 1px);background-size:48px 48px;}
+.hero-inner{max-width:860px;margin:0 auto;position:relative;}
+.breadcrumb{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,0.45);margin-bottom:18px;}
+.breadcrumb a{color:rgba(255,198,39,0.7);text-decoration:none;transition:color 0.2s;}
+.breadcrumb a:hover{color:var(--gold);}
+.breadcrumb span{color:rgba(255,255,255,0.25);}
+.page-hero h1{font-family:"Playfair Display",serif;font-size:clamp(1.8rem,4vw,2.8rem);font-weight:700;color:var(--white);line-height:1.2;margin-bottom:20px;}
+.hero-pills{display:flex;gap:10px;flex-wrap:wrap;}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:100px;padding:5px 14px;font-size:12px;font-weight:500;}
+.pill-done{background:rgba(70,174,70,0.18);border:1px solid rgba(70,174,70,0.35);color:#90EE90;}
+.pill-info{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);}
+
+/* LAYOUT */
+.page-body{display:grid;grid-template-columns:220px 1fr;gap:48px;max-width:1040px;margin:0 auto;padding:52px 2rem 80px;align-items:start;}
+
+/* SIDEBAR TOC */
+.toc{position:sticky;top:76px;}
+.toc-title{font-size:10px;font-weight:600;color:var(--text-muted);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.toc-list{list-style:none;}
+.toc-list li{margin-bottom:2px;}
+.toc-list a{display:block;font-size:12px;color:var(--text-muted);text-decoration:none;padding:5px 10px;border-radius:6px;border-left:2px solid transparent;transition:all 0.2s;}
+.toc-list a:hover,.toc-list a.active{color:var(--maroon);background:rgba(140,29,64,0.06);border-left-color:var(--maroon);}
+.toc-list li.sub a{padding-left:20px;font-size:11px;}
+
+/* CONTENT */
+.content h2{font-family:"Playfair Display",serif;font-size:1.5rem;font-weight:600;color:var(--text);margin:52px 0 16px;padding-bottom:10px;border-bottom:2px solid var(--gold);}
+.content h2:first-child{margin-top:0;}
+.content h3{font-size:1rem;font-weight:600;color:var(--maroon);margin:28px 0 10px;}
+.content p{font-size:15px;color:var(--text-muted);font-weight:300;margin-bottom:14px;line-height:1.75;}
+.content strong{color:var(--text);font-weight:600;}
+.content ul,.content ol{padding-left:20px;margin-bottom:14px;}
+.content li{font-size:15px;color:var(--text-muted);font-weight:300;margin-bottom:6px;line-height:1.7;}
+.content code{font-family:"JetBrains Mono",monospace;font-size:12px;background:rgba(140,29,64,0.07);color:var(--maroon);padding:2px 6px;border-radius:4px;border:1px solid rgba(140,29,64,0.12);}
+.content pre{background:var(--gray-50);border:1px solid var(--border);border-left:3px solid var(--maroon);border-radius:0 8px 8px 0;padding:18px 20px;overflow-x:auto;margin:16px 0;}
+.content pre code{background:none;border:none;color:var(--gray-600);font-size:13px;padding:0;line-height:1.6;}
+
+/* TABLES */
+.table-wrap{border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);margin:20px 0;}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--maroon);}
+thead th{padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:rgba(255,255,255,0.85);letter-spacing:0.06em;text-transform:uppercase;}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.15s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--gray-50);}
+tbody td{padding:11px 16px;font-size:13px;color:var(--text);vertical-align:top;}
+.topic{font-family:"JetBrains Mono",monospace;font-size:11px;background:rgba(140,29,64,0.08);color:var(--maroon);padding:2px 7px;border-radius:4px;border:1px solid rgba(140,29,64,0.15);white-space:nowrap;}
+.custom-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(255,198,39,0.15);color:var(--gold-dark);border:1px solid rgba(255,198,39,0.3);}
+.lib-badge{display:inline-block;font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;background:var(--gray-100);color:var(--gray-600);border:1px solid var(--border);}
+
+/* INFO BOXES */
+.info-box{background:rgba(140,29,64,0.04);border-left:3px solid var(--maroon);border-radius:0 8px 8px 0;padding:14px 18px;margin:18px 0;}
+.info-box p{margin-bottom:0;font-size:14px;}
+.formula-box{background:var(--gray-50);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin:16px 0;font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--gray-600);line-height:1.8;}
+
+/* ARCH IMAGE */
+.arch-wrap{border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);margin:20px 0;cursor:zoom-in;}
+.arch-wrap img{width:100%;display:block;transition:transform 0.2s;}
+.arch-wrap:hover img{transform:scale(1.01);}
+.arch-hint{text-align:center;font-size:11px;color:var(--text-muted);padding:8px;background:var(--gray-50);border-top:1px solid var(--border);}
+
+/* SAFETY CARDS */
+.safety-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0;}
+.safety-card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:16px 18px;border-top:3px solid var(--maroon);}
+.sc-num{font-family:"Playfair Display",serif;font-size:1.3rem;font-weight:700;color:var(--maroon);}
+.sc-title{font-size:13px;font-weight:600;color:var(--text);margin:4px 0 6px;}
+.sc-desc{font-size:12px;color:var(--text-muted);line-height:1.6;}
+
+/* BRANCH BOX */
+.branch-box{background:var(--gray-50);border:1px solid var(--border);border-radius:10px;padding:18px 20px;font-family:"JetBrains Mono",monospace;font-size:13px;line-height:2.2;color:var(--gray-600);}
+.branch-main{color:var(--maroon);font-weight:500;}
+
+/* PAGE NAV */
+.page-nav{display:flex;justify-content:space-between;align-items:center;margin-top:60px;padding-top:24px;border-top:1px solid var(--border);}
+.page-nav a{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--maroon);text-decoration:none;padding:8px 16px;border:1px solid rgba(140,29,64,0.2);border-radius:8px;transition:all 0.2s;}
+.page-nav a:hover{background:rgba(140,29,64,0.06);}
+
+/* LIGHTBOX */
+.lightbox{display:none;position:fixed;inset:0;background:rgba(20,16,12,0.92);z-index:1000;align-items:center;justify-content:center;cursor:zoom-out;}
+.lightbox.active{display:flex;}
+.lightbox img{max-width:92vw;max-height:88vh;border-radius:8px;}
+.lb-close{position:fixed;top:20px;right:28px;color:white;font-size:22px;cursor:pointer;background:rgba(255,255,255,0.1);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:none;}
+
+/* FOOTER */
+footer{background:var(--maroon-dark,#6B1530);padding:40px 2rem;text-align:center;}
+.footer-logo{font-family:"Playfair Display",serif;font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:8px;}
+.footer-sub{font-size:12px;color:rgba(255,255,255,0.45);margin-bottom:16px;}
+.footer-links{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;}
+.footer-links a{font-size:12px;color:rgba(255,198,39,0.7);text-decoration:none;}
+.footer-links a:hover{color:#FFC627;}
+
+.fade-in{opacity:0;transform:translateY(16px);transition:opacity 0.5s ease,transform 0.5s ease;}
+.fade-in.visible{opacity:1;transform:none;}
+@media(max-width:768px){.page-body{grid-template-columns:1fr;}.toc{display:none;}.safety-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="../index.html">
+    <div class="nav-logo">AFE</div>
+    <span class="nav-title">Frontier Exploration · ASU</span>
+  </a>
+  <a class="nav-back" href="../index.html#milestones">← Back to site</a>
+</nav>
+
+<div class="page-hero">
+  <div class="page-hero-grid"></div>
+  <div class="hero-inner">
+    <div class="breadcrumb">
+      <a href="../index.html">Home</a>
+      <span>/</span>
+      <a href="../index.html#milestones">Milestones</a>
+      <span>/</span>
+      <span style="color:rgba(255,255,255,0.65);">Milestone 1</span>
+    </div>
+    <h1>Milestone 1 — Proposal &amp; Architecture</h1>
+    <div class="hero-pills">
+      <span class="pill pill-done">✓ Submitted · Mar 6, 2026</span>
+      <span class="pill pill-info">Weight: 5%</span>
+      <span class="pill pill-info">~1,500 words</span>
+      <span class="pill pill-info">RAS 598: Mobile Robotics</span>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+
+  <!-- TOC SIDEBAR -->
+  <aside class="toc">
+    <div class="toc-title">Contents</div>
+    <ul class="toc-list">
+      <li><a href="#mission">Mission Statement</a></li>
+      <li><a href="#specs">Technical Specifications</a></li>
+      <li class="sub"><a href="#specs">Kinematic Model</a></li>
+      <li class="sub"><a href="#perception">Perception Stack</a></li>
+      <li><a href="#architecture">System Architecture</a></li>
+      <li><a href="#modules">Module Declaration</a></li>
+      <li><a href="#intent">Module Intent</a></li>
+      <li class="sub"><a href="#library">Library Modules</a></li>
+      <li class="sub"><a href="#custom">Custom Modules</a></li>
+      <li><a href="#safety">Safety Protocol</a></li>
+      <li><a href="#git">Git Infrastructure</a></li>
+    </ul>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="content">
+
+    <div class="fade-in" style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:40px;box-shadow:var(--shadow);">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Team</div>
+      <div style="font-size:14px;color:var(--text);font-weight:500;">Princess Colon &nbsp;·&nbsp; Manjunath Kondamu &nbsp;·&nbsp; Rohit Mane</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
+        <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank" style="color:var(--maroon);text-decoration:none;font-weight:500;">github.com/PriColon/mobile-robotics-frontier-exploration ↗</a>
+      </div>
+    </div>
+
+    <!-- MISSION -->
+    <section id="mission" class="fade-in">
+      <h2>Mission Statement &amp; Scope</h2>
+      <p>Our robot is designed to autonomously explore a completely unknown indoor environment — such as a lab corridor or multi-room office space — without any prior map, human guidance, or pre-programmed paths. As it explores, it builds a live occupancy map and semantically classifies regions of the environment as clear, cluttered, or hazardous using its onboard RGB-D camera.</p>
+      <div class="info-box"><p><strong>The problem being solved:</strong> Standard mobile robot deployments require a pre-built map before autonomous navigation is possible. This creates a chicken-and-egg problem in unknown or dynamically changed environments. Our system solves this by combining frontier-based exploration with semantic awareness, enabling the robot to build, classify, and navigate its environment simultaneously from scratch.</p></div>
+      <p><strong>Target Environment:</strong> Static indoor environment — lab corridors, office rooms, and interconnected hallways. The environment contains furniture, walls, doorways, and open floor space. All obstacles are assumed static during a single exploration run.</p>
+      <p><strong>Success State:</strong> The robot successfully explores at least 80% of the reachable floor area within a bounded environment, terminates exploration gracefully when no new frontiers exist, and produces a final labeled occupancy grid map distinguishing clear, cluttered, and hazardous zones — all without any human intervention after launch.</p>
+    </section>
+
+    <!-- SPECS -->
+    <section id="specs" class="fade-in">
+      <h2>Technical Specifications</h2>
+      <p><strong>Robot Platform:</strong> TurtleBot4 Lite — iRobot Create3 base with Raspberry Pi 4 (2GB) compute board</p>
+      <p><strong>Kinematic Model:</strong> Differential Drive — two independently driven wheels with a passive caster. The robot turns by varying the relative speed of the left and right wheels.</p>
+      <div class="formula-box">v = (v_r + v_l) / 2 &nbsp;&nbsp;&nbsp;&nbsp; (linear velocity)<br/>ω = (v_r - v_l) / L &nbsp;&nbsp;&nbsp;&nbsp; (angular velocity, L = wheelbase)</div>
+    </section>
+
+    <!-- PERCEPTION -->
+    <section id="perception" class="fade-in">
+      <h2>Perception Stack</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Sensor</th><th>Model</th><th>ROS2 Topic</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>2D LiDAR</td><td>RPLIDAR A1M8</td><td><span class="topic">/scan</span></td><td>SLAM map building, obstacle detection</td></tr>
+            <tr><td>RGB-D Camera</td><td>Luxonis OAK-D</td><td><span class="topic">/oakd/rgb/preview/image_raw</span></td><td>Semantic region classification</td></tr>
+            <tr><td>Stereo Depth</td><td>OAK-D stereo pair</td><td><span class="topic">/oakd/stereo/image_raw</span></td><td>Depth-based hazard detection</td></tr>
+            <tr><td>IMU (Create3)</td><td>Built-in ICM-42670</td><td><span class="topic">/imu</span></td><td>Orientation, EKF fusion</td></tr>
+            <tr><td>IMU (OAK-D)</td><td>Built-in IMU</td><td><span class="topic">/oakd/imu/data</span></td><td>Secondary orientation source</td></tr>
+            <tr><td>Wheel Encoders</td><td>Create3 built-in</td><td><span class="topic">/odom</span></td><td>Primary distance measurement</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ARCHITECTURE -->
+    <section id="architecture" class="fade-in">
+      <h2>High-Level System Architecture</h2>
+      <p>The system follows the <strong>Perception → Estimation → Planning → Actuation</strong> pipeline. A reactive bypass allows the behavior coordinator to receive direct semantic feedback from the perception layer, enabling hazard-aware goal selection independently of map update speed.</p>
+      <div class="arch-wrap" onclick="document.getElementById('lb').classList.add('active')">
+        <img src="../assets/images/architecture.png" alt="System Architecture Diagram"/>
+        <div class="arch-hint">🔍 Click to zoom</div>
+      </div>
+    </section>
+
+    <!-- MODULES TABLE -->
+    <section id="modules" class="fade-in">
+      <h2>Module Declaration Table</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Module / Node</th><th>Domain</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>rplidar_ros2</code></td><td>Perception</td><td><span class="lib-badge">Library</span></td><td>Publishes raw 2D scan data</td></tr>
+            <tr><td><code>depthai_ros</code></td><td>Perception</td><td><span class="lib-badge">Library</span></td><td>Publishes RGB and stereo depth streams</td></tr>
+            <tr><td>SLAM Toolbox</td><td>Estimation</td><td><span class="lib-badge">Library</span></td><td>Builds 2D occupancy grid map</td></tr>
+            <tr><td>Robot Localization EKF</td><td>Estimation</td><td><span class="lib-badge">Library</span></td><td>Fuses wheel odometry and IMU data</td></tr>
+            <tr><td>Frontier Explorer Node</td><td>Planning</td><td><span class="custom-badge">Custom</span></td><td>Detects frontier cells and scores by information gain</td></tr>
+            <tr><td>Semantic Hazard Classifier</td><td>Planning</td><td><span class="custom-badge">Custom</span></td><td>Classifies camera regions as clear, cluttered, or hazardous</td></tr>
+            <tr><td>Behavior Coordinator</td><td>Planning</td><td><span class="custom-badge">Custom</span></td><td>State machine managing exploration decisions</td></tr>
+            <tr><td>Nav2 Global Planner</td><td>Planning</td><td><span class="lib-badge">Library</span></td><td>Calculates collision-free path to navigation goal</td></tr>
+            <tr><td>Diff-Drive Controller</td><td>Actuation</td><td><span class="lib-badge">Library</span></td><td>Translates velocity commands to wheel speeds</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MODULE INTENT -->
+    <section id="intent" class="fade-in">
+      <h2>Module Intent</h2>
+      <h3 id="library">Library Modules</h3>
+
+      <h3>SLAM Toolbox</h3>
+      <p>We will use <code>slam_toolbox</code> in asynchronous mode (<code>async_slam_toolbox_node</code>) to generate a live 2D occupancy grid from the RPLIDAR scan data. Key configuration parameters: <code>resolution</code> (0.05m per cell), <code>minimum_travel_distance</code> and <code>minimum_travel_heading</code> (controlling map update frequency), and <code>scan_buffer_maximum_scan_queue_size</code>. SLAM Toolbox was chosen over RTAB-Map for its lower CPU overhead — critical given the Raspberry Pi 4's 2GB RAM constraints.</p>
+
+      <h3>Robot Localization EKF</h3>
+      <p>We will use the <code>robot_localization</code> package to implement an Extended Kalman Filter that fuses wheel encoder odometry (<code>/odom</code> at 20Hz) with the Create3's built-in IMU (<code>/imu</code> at 100Hz) and the OAK-D's secondary IMU (<code>/oakd/imu/data</code>). The EKF runs in 2D mode (estimating x, y, yaw only). The output <code>/odometry/filtered</code> topic provides SLAM Toolbox with a stable <code>odom → base_link</code> transform.</p>
+
+      <h3>Nav2 Global Planner</h3>
+      <p>Nav2 handles local path planning and obstacle avoidance once the Behavior Coordinator selects a frontier goal. We will tune <code>inflation_radius</code> (0.3m — one robot diameter) and configure the <code>DWBLocalPlanner</code> with <code>max_vel_x: 0.2 m/s</code> appropriate for indoor exploration. Nav2 integrates directly with the occupancy grid output from SLAM Toolbox and provides robust recovery behaviors when the robot gets stuck.</p>
+
+      <h3>Diff-Drive Controller</h3>
+      <p>The Create3 base directly consumes <code>geometry_msgs/Twist</code> messages on <code>/cmd_vel</code>, making the hardware interface transparent to ROS2. No custom firmware is required. Velocity and acceleration limits are configured through Nav2's controller parameters (<code>max_vel_x: 0.22</code>, <code>max_vel_theta: 1.0</code>, <code>acc_lim_x: 0.5</code>).</p>
+
+      <h3 id="custom">Custom Modules</h3>
+
+      <h3>Frontier Explorer Node</h3>
+      <p>This node implements a frontier-based exploration algorithm from scratch, based on the foundational work of Yamauchi (1997) extended with information-theoretic goal scoring. The node subscribes to <code>/map</code> (the live <code>nav_msgs/OccupancyGrid</code>) and identifies frontier cells — free cells (value 0) adjacent to at least one unknown cell (value -1). It uses connected-component labeling via <code>scipy.ndimage</code> to cluster frontier cells into contiguous regions.</p>
+      <p>Each frontier region is scored using an information-gain function:</p>
+      <div class="formula-box">score(R) = (α × size(R) + β × unknown_near(R)) / (dist(R) + ε)</div>
+      <p>The node publishes a ranked <code>geometry_msgs/PoseArray</code> to <code>/frontier_goals</code> and a <code>visualization_msgs/MarkerArray</code> to <code>/frontier_markers</code> for live RViz2 inspection.</p>
+
+      <h3>Semantic Hazard Classifier</h3>
+      <p>This node processes the OAK-D camera feed to classify regions into three semantic categories: <strong>CLEAR</strong> (open passable space), <strong>CLUTTERED</strong> (moderate obstacle density), and <strong>HAZARD</strong> (dense obstacles, transparent surfaces, or potential drop-offs). Each frame is divided into a spatial grid of patches. For each patch: edge density via Canny detection on the RGB image, mean depth and depth variance from the stereo image, and the ratio of NaN depth values. These features feed a rule-based classifier tuned on labeled lab images. Output is published as a coarse <code>nav_msgs/OccupancyGrid</code> to <code>/semantic_map</code>.</p>
+
+      <h3>Behavior Coordinator</h3>
+      <p>This node implements the state machine governing all exploration decisions. It defines five states: <strong>IDLE → SELECTING → NAVIGATING → ARRIVED → DONE</strong>. It subscribes to <code>/frontier_goals</code>, <code>/semantic_map</code>, and <code>/battery_state</code>, and uses the Nav2 <code>NavigateToPose</code> action client to dispatch goals. The coordinator filters frontier candidates against the current semantic map — skipping any frontier overlapping a HAZARD zone — and maintains a visited-frontiers set to prevent re-exploring.</p>
+    </section>
+
+    <!-- SAFETY -->
+    <section id="safety" class="fade-in">
+      <h2>Safety &amp; Operational Protocol</h2>
+      <p><strong>Deadman Switch:</strong> If no <code>/frontier_goals</code> update is received for more than <strong>5 seconds</strong>, the coordinator publishes zero-velocity to <code>/cmd_vel</code> and transitions to IDLE.</p>
+      <div class="safety-grid">
+        <div class="safety-card"><div class="sc-num">1</div><div class="sc-title">Battery E-Stop</div><div class="sc-desc">If <code>/battery_state.percentage</code> drops below 15%, cancel all goals, publish zero velocity, transition to DONE.</div></div>
+        <div class="safety-card"><div class="sc-num">2</div><div class="sc-title">Hazard Detection E-Stop</div><div class="sc-desc">Subscribe to <code>/hazard_detection</code>. On any BUMP or CLIFF event: immediate zero velocity and cancel active navigation goal.</div></div>
+        <div class="safety-card"><div class="sc-num">3</div><div class="sc-title">Nav2 Repeated Failure</div><div class="sc-desc">If Nav2 rejects or fails the same goal three times in succession, mark frontier unreachable and select next candidate.</div></div>
+        <div class="safety-card"><div class="sc-num">4</div><div class="sc-title">Operator Kill Topic</div><div class="sc-desc">Publishing <code>true</code> to <code>/exploration/stop</code> (<code>std_msgs/Bool</code>) immediately stops all motion and shuts down the exploration stack.</div></div>
+      </div>
+      <div class="info-box"><p><strong>Physical Safety Protocol:</strong> During all real-robot tests, one team member must remain physically present within arm's reach of the Create3's power button. Maximum configured velocity is 0.2 m/s for all indoor exploration runs.</p></div>
+    </section>
+
+    <!-- GIT -->
+    <section id="git" class="fade-in">
+      <h2>Git Infrastructure</h2>
+      <p><strong>Team Repository:</strong> <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank" style="color:var(--maroon);font-weight:500;">github.com/PriColon/mobile-robotics-frontier-exploration ↗</a></p>
+      <p>All three teammates added as members with write access. Each team member's personal project site includes the shared repository as a Git submodule at <code>_projects/tb4-frontier-exploration</code>.</p>
+      <div class="branch-box">
+<span class="branch-main">main</span>              ← stable, tested code only<br/>
+person-a/slam     ← Princess: perception + EKF configuration<br/>
+person-b/nodes    ← Rohit: frontier explorer + semantic classifier<br/>
+person-c/coord    ← Manjunath: behavior coordinator + launch files
+      </div>
+    </section>
+
+    <div class="page-nav fade-in">
+      <a href="../index.html#milestones">← Back to Milestones</a>
+      <a href="../index.html#team">Meet the Team →</a>
+    </div>
+
+  </main>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lb" onclick="this.classList.remove('active')">
+  <button class="lb-close" onclick="document.getElementById('lb').classList.remove('active')">✕</button>
+  <img src="../assets/images/architecture.png" alt="Architecture Zoomed"/>
+</div>
+
+<footer>
+  <div class="footer-logo">Autonomous Frontier Exploration</div>
+  <div class="footer-sub">RAS 598: Mobile Robotics · Arizona State University · Spring 2026</div>
+  <div class="footer-links">
+    <a href="../index.html">Home</a>
+    <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank">GitHub</a>
+    <a href="https://ras-mobile-robotics.github.io/project/m1.html" target="_blank">Course Site</a>
+  </div>
+</footer>
+
+<script>
+const obs=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting)x.target.classList.add('visible');});},{threshold:0.1});
+document.querySelectorAll('.fade-in').forEach(el=>obs.observe(el));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('lb').classList.remove('active');});
+// TOC active state
+const headings=document.querySelectorAll('section[id]');
+const links=document.querySelectorAll('.toc-list a');
+window.addEventListener('scroll',()=>{
+  let cur='';
+  headings.forEach(h=>{if(window.scrollY>=h.offsetTop-100)cur=h.id;});
+  links.forEach(a=>{
+    const href=a.getAttribute('href').replace('#','');
+    a.classList.toggle('active',href===cur);
+  });
+},{passive:true});
+</script>
+</body>
+</html>
