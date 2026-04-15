@@ -205,3 +205,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+
