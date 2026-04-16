@@ -1,0 +1,652 @@
+\documentclass[12pt,a4paper]{article}
+
+% ── Packages ────────────────────────────────────────────────────────────────
+\usepackage{amsmath, amssymb, bm}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{parskip}
+\usepackage{titlesec}
+
+\geometry{margin=2.5cm}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+
+% ── Convenience macros ──────────────────────────────────────────────────────
+\newcommand{\cph}{\cos\phi}
+\newcommand{\sph}{\sin\phi}
+\newcommand{\cth}{\cos\theta}
+\newcommand{\sth}{\sin\theta}
+\newcommand{\cps}{\cos\psi}
+\newcommand{\sps}{\sin\psi}
+\newcommand{\tph}{\tan\phi}
+\newcommand{\tth}{\tan\theta}
+\newcommand{\q}{\mathbf{q}}
+\newcommand{\bu}{\mathbf{u}}
+\newcommand{\bF}{\mathbf{F}}
+\newcommand{\bP}{\mathbf{P}}
+\newcommand{\bK}{\mathbf{K}}
+\newcommand{\bH}{\mathbf{H}}
+\newcommand{\bQ}{\mathbf{Q}}
+\newcommand{\bR}{\mathbf{R}}
+\newcommand{\bI}{\mathbf{I}}
+\newcommand{\eone}{\mathbf{e}_1}
+
+% ── Title ────────────────────────────────────────────────────────────────────
+\title{%
+  \textbf{Mathematical Foundations}\\[0.4em]
+  \large Autonomous Frontier Exploration with Semantic Hazard Mapping\\[0.2em]
+  \normalsize RAS 598: Mobile Robotics $\cdot$ Spring 2026 $\cdot$ ASU
+}
+\author{Rohit Mane \texttt{(rmane2)}}
+\date{}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{2D Differential Drive Kinematics}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{State Vector and Control Inputs}
+
+The TurtleBot4 Lite uses an iRobot Create3 differential drive base.
+The robot's pose is described by three quantities.
+The control inputs are the angular velocities of the left and right wheels:
+
+\begin{equation}
+  \q(t) = \begin{bmatrix} x(t) \\ y(t) \\ \psi(t) \end{bmatrix},
+  \qquad
+  \bu(t) = \begin{bmatrix} \omega_L(t) \\ \omega_R(t) \end{bmatrix}
+  \tag{1}
+\end{equation}
+
+\begin{center}
+\begin{tabular}{>{\(}l<{\)} l l}
+  \toprule
+  \text{Symbol} & Meaning & Value (TurtleBot4 Lite) \\
+  \midrule
+  x,\, y        & Position of robot centre in world frame & --- \\
+  \psi          & Heading angle from positive $x$-axis [rad] & --- \\
+  \omega_L,\,\omega_R & Left/right wheel angular velocities [rad\,s$^{-1}$] & max 8.8 rad\,s$^{-1}$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+% ──────────────────────────────────────────────────────────────────────────────
+\subsection{Wheel Velocities to Linear and Angular Velocity}
+
+Each wheel of radius $r$ contributes a tangential speed. The net linear speed $v$
+and yaw rate $\dot\psi$ are their symmetric and antisymmetric combinations,
+normalised by the wheelbase $L$:
+
+\begin{equation}
+  v(t) = \frac{r}{2}\bigl(\omega_R(t) + \omega_L(t)\bigr)
+  \tag{2}
+\end{equation}
+
+\begin{equation}
+  \dot{\psi}(t) = \frac{r}{L}\bigl(\omega_R(t) - \omega_L(t)\bigr)
+  \tag{3}
+\end{equation}
+
+\begin{center}
+\begin{tabular}{>{\(}l<{\)} l l}
+  \toprule
+  \text{Symbol} & Meaning & TurtleBot4 Lite value \\
+  \midrule
+  r & Wheel radius [m] & 0.0352\,m \\
+  L & Track width (wheel-to-wheel) [m] & 0.233\,m \\
+  v & Forward linear speed [m\,s$^{-1}$] & max 0.31\,m\,s$^{-1}$ \\
+  \dot\psi & Yaw rate [rad\,s$^{-1}$] & max 1.90\,rad\,s$^{-1}$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+% ──────────────────────────────────────────────────────────────────────────────
+\subsection{Continuous-Time Motion Model (ODE)}
+
+Projecting the forward speed onto the world frame gives the full nonlinear
+kinematic model:
+
+\begin{equation}
+  \dot{\q}(t)
+  = \begin{bmatrix} \dot{x}(t) \\ \dot{y}(t) \\ \dot{\psi}(t) \end{bmatrix}
+  = \begin{bmatrix} v(t)\cos\psi(t) \\ v(t)\sin\psi(t) \\ \dot{\psi}(t) \end{bmatrix}
+  = f\bigl(\q(t),\,\bu(t)\bigr)
+  \tag{4}
+\end{equation}
+
+% ──────────────────────────────────────────────────────────────────────────────
+\subsection{Discrete-Time State Update (Euler Integration)}
+
+For a fixed timestep $\Delta t$ using forward Euler:
+
+\begin{equation}
+  \q_{k+1} = \q_k + \Delta t \cdot f(\q_k,\,\bu_k)
+  \tag{5}
+\end{equation}
+
+Expanding the three state components explicitly:
+
+\begin{equation}
+  \begin{aligned}
+    x_{k+1}   &= x_k   + v_k \cos\psi_k \cdot \Delta t \\
+    y_{k+1}   &= y_k   + v_k \sin\psi_k \cdot \Delta t \\
+    \psi_{k+1} &= \psi_k + \dot{\psi}_k  \cdot \Delta t
+  \end{aligned}
+  \tag{6}
+\end{equation}
+
+where $v_k$ and $\dot\psi_k$ are computed from
+$(\omega_{L,k},\,\omega_{R,k})$ via equations~(2)--(3).
+
+% ──────────────────────────────────────────────────────────────────────────────
+\subsection{Exact Arc-Based Integration (Curved Motion)}
+
+When $\dot\psi_k \neq 0$, integrating exactly over the arc avoids
+Euler accumulation error. Let $\kappa = \dot\psi_k\,\Delta t$:
+
+\begin{equation}
+  \begin{aligned}
+    x_{k+1}   &= x_k + \frac{v_k}{\dot{\psi}_k}
+                  \Bigl(\sin(\psi_k+\kappa) - \sin\psi_k\Bigr) \\
+    y_{k+1}   &= y_k - \frac{v_k}{\dot{\psi}_k}
+                  \Bigl(\cos(\psi_k+\kappa) - \cos\psi_k\Bigr) \\
+    \psi_{k+1} &= \psi_k + \kappa
+  \end{aligned}
+  \tag{7}
+\end{equation}
+
+When $\dot\psi_k \approx 0$ (straight-line motion), equation~(6) is
+numerically preferred; equation~(7) degenerates gracefully via
+L'H\^{o}pital's rule to the same result.
+
+% ──────────────────────────────────────────────────────────────────────────────
+\subsection{Full Mapping: Control Inputs $\to$ State Update}
+
+Combining equations~(2)--(3) and~(6), the explicit mapping from
+wheel velocities to state update is:
+
+\begin{equation}
+  \begin{bmatrix} x_{k+1} \\ y_{k+1} \\ \psi_{k+1} \end{bmatrix}
+  =
+  \begin{bmatrix} x_k \\ y_k \\ \psi_k \end{bmatrix}
+  +
+  \frac{r\,\Delta t}{2}
+  \begin{bmatrix}
+    (\omega_{R,k}+\omega_{L,k})\cos\psi_k \\
+    (\omega_{R,k}+\omega_{L,k})\sin\psi_k \\
+    \dfrac{2}{L}(\omega_{R,k}-\omega_{L,k})
+  \end{bmatrix}
+  \tag{8}
+\end{equation}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\newpage
+\section{Frontier Scoring Formula}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{The Formula}
+
+Among all candidate frontier regions $R$ on the boundary between
+known-free and unknown space, the robot selects the one with the highest score:
+
+\begin{equation}
+  \text{score}(R)
+  = \frac{\alpha \cdot \text{size}(R) \;+\; \beta \cdot \text{unknown}(R)}
+         {\text{dist}(R) + \varepsilon}
+  \tag{9}
+\end{equation}
+
+\begin{center}
+\begin{tabular}{>{\(}l<{\)} l l}
+  \toprule
+  \text{Symbol} & Meaning & Value in code \\
+  \midrule
+  \text{size}(R)    & Number of frontier cells in region $R$ & cluster size \\
+  \text{unknown}(R) & Unknown cells within $r{=}0.5$\,m of centroid & count at radius \\
+  \text{dist}(R)    & Euclidean distance from robot to centroid [m] & metres \\
+  \alpha            & Size weight & \texttt{1.0} \\
+  \beta             & Information gain weight & \texttt{2.0} \\
+  \varepsilon       & Division-by-zero guard & \texttt{1e-6} \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Note on parameter values:}
+The implemented values are $\alpha = 1.0$, $\beta = 2.0$, $\varepsilon = 10^{-6}$.
+These weight information gain twice as heavily as frontier size
+($\alpha/\beta = 0.5$), driving aggressive map coverage.
+Only the ratio $\alpha/\beta$ affects frontier ranking ---
+scaling both by a constant leaves all scores unchanged.
+
+% ──────────────────────────────────────────────────────────────────────────────
+\subsection{Parameter Rationale}
+
+\paragraph{$\alpha$ --- size weight (1.0).}
+Favours large open frontiers over isolated pockets, preventing the robot
+from wasting navigation budget on tiny dead-end corridors.
+Typical range: $\alpha \in [0.3,\,1.0]$.
+
+\paragraph{$\beta$ --- unknown weight (2.0).}
+Directly rewards information gain. Higher $\beta$ drives aggressive exploration;
+lower $\beta$ produces cautious, thorough coverage.
+Typical range: $\beta \in [1.0,\,3.0]$.
+
+\paragraph{$\varepsilon$ --- stability guard (\texttt{1e-6}).}
+Must satisfy $\varepsilon \ll \min_R \text{dist}(R)$.
+At $10^{-6}$\,m it stabilises the denominator without biasing scores for
+any realistic robot position.
+
+\paragraph{The $\alpha/\beta$ ratio.}
+\begin{itemize}
+  \item $\alpha/\beta < 1$: robot prioritises information density over area.
+  \item $\alpha/\beta > 1$: robot prefers large open spaces.
+\end{itemize}
+Our ratio $\alpha/\beta = 0.5$ prioritises information density.
+
+% ──────────────────────────────────────────────────────────────────────────────
+\subsection{Failure Modes and Mitigations}
+
+\begin{description}
+  \item[Greedy cycling.]
+        Two frontiers with equal scores cause oscillation.
+        Mitigation: hysteresis bonus for currently-targeted frontier.
+
+  \item[Distance dominance late in mapping.]
+        When all remaining unknowns are far away, the denominator overwhelms
+        the numerator and scores compress.
+        Mitigation: normalise $\text{dist}(R)$ by the map diagonal,
+        or use a log penalty $\ln(\text{dist}+1)$.
+
+  \item[$\alpha/\beta$ wrong for environment.]
+        Open warehouses favour high $\alpha$; tight corridors favour high $\beta$.
+        Mitigation: tune offline on a representative map.
+
+  \item[$\varepsilon$ too large.]
+        If $\varepsilon \gg \text{dist}(R)$ for near frontiers,
+        the distance penalty vanishes.
+        Keep $\varepsilon \ll$ minimum expected distance.
+\end{description}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\newpage
+\section{SLAM: Occupancy Grid via Bayes Rule}
+% ══════════════════════════════════════════════════════════════════════════════
+
+SLAM Toolbox maintains a probabilistic occupancy grid where each cell $m_i$
+stores the log-odds of being occupied given all sensor observations $z_{1:t}$.
+
+\subsection{Log-Odds Representation}
+
+The log-odds of a probability $p$ is defined as:
+
+\begin{equation}
+  l(p) = \log\left(\frac{p}{1-p}\right)
+  \tag{10}
+\end{equation}
+
+This maps probabilities $[0,1]$ to $(-\infty,+\infty)$, making Bayesian updates
+an additive operation that is numerically stable and computationally cheap.
+
+\subsection{Recursive Bayesian Update}
+
+\begin{equation}
+  l(m_i \mid z_{1:t})
+  = l(m_i \mid z_{1:t-1}) + l(m_i \mid z_t) - l_0
+  \tag{11}
+\end{equation}
+
+\begin{center}
+\begin{tabular}{>{\(}l<{\)} l l}
+  \toprule
+  \text{Symbol} & Meaning & Default value \\
+  \midrule
+  l(m_i \mid z_t) & Sensor model log-odds (LiDAR hit) & $+0.85$ \\
+  l(m_i \mid z_t) & Sensor model log-odds (LiDAR miss) & $-0.4$ \\
+  l_0             & Prior log-odds (uniform 50\% prior) & $0$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+To recover probability from log-odds:
+$p = 1 - \dfrac{1}{1 + e^l}$.
+The \texttt{OccupancyGrid} message encodes probabilities as integers
+0--100 (0\,=\,free, 100\,=\,occupied, $-1$\,=\,unknown).
+
+% ══════════════════════════════════════════════════════════════════════════════
+\newpage
+\section{Extended Kalman Filter: Prediction and Update}
+% ══════════════════════════════════════════════════════════════════════════════
+
+The \texttt{robot\_localization} EKF node fuses wheel odometry (\texttt{/odom})
+and IMU data to produce \texttt{/odometry/filtered}, consumed by the frontier
+explorer and behavior coordinator nodes.
+
+\subsection{Prediction Step}
+
+\begin{equation}
+  \hat{\q}_{k+1|k}
+  = \q_k + \Delta t
+  \begin{bmatrix}
+    v\cos\theta_k \\
+    v\sin\theta_k \\
+    \dfrac{r}{L}(\omega_R - \omega_L)
+  \end{bmatrix}
+  \tag{12}
+\end{equation}
+
+\begin{equation}
+  \bP_{k+1|k} = \bF_k \bP_k \bF_k^\top + \bQ_k
+  \tag{13}
+\end{equation}
+
+The Jacobian of the motion model (first-order Taylor linearisation):
+
+\begin{equation}
+  \bF_k = \bI + \Delta t
+  \begin{bmatrix}
+    0 & 0 & -v\sin\theta_k \\
+    0 & 0 &  v\cos\theta_k \\
+    0 & 0 & 0
+  \end{bmatrix}
+  \tag{14}
+\end{equation}
+
+\begin{center}
+\begin{tabular}{>{\(}l<{\)} l}
+  \toprule
+  \text{Symbol} & Meaning \\
+  \midrule
+  \bP_k   & $3{\times}3$ state covariance matrix at step $k$ \\
+  \bQ_k   & Process noise covariance (wheel slip, unmodelled dynamics) \\
+  \bF_k   & Jacobian of $f$ with respect to state $\q$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Update Step}
+
+When a sensor measurement $z_k$ arrives (IMU yaw rate, wheel encoder):
+
+\begin{equation}
+  \bK_k = \bP_{k|k-1}\bH_k^\top
+  \left(\bH_k \bP_{k|k-1} \bH_k^\top + \bR_k \right)^{-1}
+  \tag{15}
+\end{equation}
+
+\begin{equation}
+  \hat{\q}_{k|k}
+  = \hat{\q}_{k|k-1}
+  + \bK_k \left(z_k - h(\hat{\q}_{k|k-1})\right)
+  \tag{16}
+\end{equation}
+
+\begin{equation}
+  \bP_{k|k} = (\bI - \bK_k \bH_k)\bP_{k|k-1}
+  \tag{17}
+\end{equation}
+
+\begin{center}
+\begin{tabular}{>{\(}l<{\)} l}
+  \toprule
+  \text{Symbol} & Meaning \\
+  \midrule
+  \bH_k & Jacobian of measurement model $h$ w.r.t.\ state \\
+  \bR_k & Measurement noise covariance \\
+  \bK_k & Kalman gain --- weights prediction vs.\ measurement trust \\
+  z_k - h(\hat{\q}) & Innovation: difference between actual and predicted measurement \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\newpage
+\section{Semantic Hazard Classifier}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{HSV Threshold Rules}
+
+The classifier evaluates a $3{\times}4$ patch grid extracted from the OAK-D
+RGB stream. For each patch, hue, saturation, brightness, and edge density
+are tested against the following thresholds (all HSV values in OpenCV scale:
+$H \in [0,180]$, $S,V \in [0,255]$):
+
+\begin{center}
+\begin{tabular}{l c c c c c}
+  \toprule
+  Class & $H$ range & $S$ threshold & $V$ threshold
+        & Edge density $\rho$ & Patch coverage \\
+  \midrule
+  FIRE    & $<20°$ or $>160°$ & $>120$ & $>120$ & ---   & $>12\%$ \\
+  WATER   & $90°$--$130°$      & $>20$  & $>80$  & ---   & $>18\%$ \\
+  SMOKE   & any                & $<30$  & $60$--$170$ & --- & $>55\%$ \\
+  HAZMAT cue & $18°$--$36°$   & $>100$ & $>100$ & ---   & $>15\%$ \\
+  DEBRIS  & any                & any    & any    & $>0.22$ & --- \\
+  DARK    & any                & any    & $\bar V < 45$ & --- & mean brightness \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Edge Density Formula}
+
+For a patch region-of-interest (ROI), edge density $\rho$ is computed
+using the Canny operator with thresholds $\tau_1 = 50$, $\tau_2 = 150$:
+
+\begin{equation}
+  \rho_{\text{edge}}
+  = \frac{\left|\left\{p \in \text{ROI} : |\nabla I(p)| > \tau\right\}\right|}{|\text{ROI}|}
+  \tag{18}
+\end{equation}
+
+Debris, cables, and structural collapse produce $\rho > 0.22$;
+smooth clean floors produce $\rho < 0.10$.
+
+\subsection{HAZMAT Detection: YOLOv3-tiny Decoding and NMS}
+
+DeepHAZMAT uses a YOLOv3-tiny backbone. The predicted bounding box
+centre, width, and height are decoded from raw network outputs
+$(t_x, t_y, t_w, t_h)$ as:
+
+\begin{equation}
+  b_x = \sigma(t_x) + c_x, \quad
+  b_y = \sigma(t_y) + c_y, \quad
+  b_w = p_w e^{t_w}, \quad
+  b_h = p_h e^{t_h}
+  \tag{19}
+\end{equation}
+
+where $(c_x, c_y)$ is the grid cell offset, $(p_w, p_h)$ are the prior
+anchor dimensions, and $\sigma$ is the sigmoid function.
+
+After decoding, Adaptive Non-Maximum Suppression removes redundant boxes:
+
+\begin{equation}
+  \text{IoU}(A,B) = \frac{|A \cap B|}{|A \cup B|}
+  \tag{20}
+\end{equation}
+
+Boxes with $\text{IoU} > \tau_{\text{NMS}} = 0.3$ and lower confidence
+are suppressed. Our minimum confidence threshold is $p_o > 0.5$.
+
+\subsection{Semantic Map Encoding}
+
+Hazard labels are encoded as integer cell values in the
+\texttt{OccupancyGrid} message:
+
+\begin{center}
+\begin{tabular}{c l l}
+  \toprule
+  Cell value & Hazard class & Behavior \\
+  \midrule
+  0   & CLEAR                  & Navigate freely \\
+  30  & DEBRIS                 & Navigate cautiously \\
+  50  & SMOKE                  & Flag for logging \\
+  70--75 & WATER / DARK        & Skip as frontier target \\
+  80  & NARROW / DEAD\_END     & Skip as frontier target \\
+  85--95 & GLASS / HAZMAT / POTHOLE & Skip + E-stop \\
+  100 & FIRE / CLIFF           & Immediate E-stop \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\newpage
+\section{Nav2 DWA Local Planner}
+% ══════════════════════════════════════════════════════════════════════════════
+
+The Dynamic Window Approach (DWA) samples feasible velocity commands and
+selects the one that best balances goal heading, obstacle clearance,
+and forward speed.
+
+\subsection{Velocity Constraints}
+
+The dynamic window restricts commands to velocities reachable within
+one control cycle $\Delta t$:
+
+\begin{equation}
+  v \in [v_{\min}, v_{\max}], \qquad
+  \omega \in [-\omega_{\max}, \omega_{\max}]
+  \tag{21}
+\end{equation}
+
+\begin{equation}
+  v \in [v_c - a_v \Delta t,\; v_c + a_v \Delta t], \qquad
+  \omega \in [\omega_c - a_\omega \Delta t,\; \omega_c + a_\omega \Delta t]
+  \tag{22}
+\end{equation}
+
+Safety constraint --- cannot command velocities that cannot brake before
+hitting an obstacle at distance $d_{\text{obstacle}}$:
+
+\begin{equation}
+  v \leq \sqrt{2 \cdot d_{\text{obstacle}} \cdot a_{v,\text{brake}}}
+  \tag{23}
+\end{equation}
+
+\subsection{Objective Function}
+
+\begin{equation}
+  G(v,\omega) = \sigma\!\left(
+    \alpha \cdot \text{heading}(v,\omega)
+    + \beta  \cdot \text{clearance}(v,\omega)
+    + \gamma \cdot \text{velocity}(v,\omega)
+  \right)
+  \tag{24}
+\end{equation}
+
+where $\sigma$ is a normalisation factor and the three sub-costs are:
+\emph{heading} --- alignment with the goal direction;
+\emph{clearance} --- distance to nearest obstacle;
+\emph{velocity} --- forward speed reward.
+
+\subsection{Arc Trajectory Prediction}
+
+During velocity sampling, DWA predicts robot position using exact
+arc integration (same as equation~7):
+
+\begin{equation}
+  \begin{bmatrix} x_{k+1} \\ y_{k+1} \\ \theta_{k+1} \end{bmatrix}
+  =
+  \begin{bmatrix}
+    x_k + R\bigl(\sin(\theta_k + \Delta\theta) - \sin\theta_k\bigr) \\
+    y_k - R\bigl(\cos(\theta_k + \Delta\theta) - \cos\theta_k\bigr) \\
+    \theta_k + \Delta\theta
+  \end{bmatrix},
+  \qquad
+  R = \frac{b}{2} \cdot \frac{\omega_R + \omega_L}{\omega_R - \omega_L}
+  \tag{25}
+\end{equation}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\newpage
+\section{3D Differential Drive Kinematics (Uneven Terrain)}
+% ══════════════════════════════════════════════════════════════════════════════
+
+For completeness and future M3 hardware testing on uneven surfaces,
+the 2D model extends to 6-DOF using ZYX Euler angles.
+Control inputs remain the two wheel velocities;
+$z$, roll, and pitch are constrained by the terrain.
+
+\subsection{Extended State Vector}
+
+\begin{equation}
+  \q(t) = \begin{bmatrix} x\\y\\z\\\phi\\\theta\\\psi \end{bmatrix},
+  \qquad
+  \bu(t) = \begin{bmatrix}\omega_L\\\omega_R\end{bmatrix}
+  \tag{26}
+\end{equation}
+
+\begin{center}
+\begin{tabular}{>{\(}l<{\)} l}
+  \toprule
+  \text{Symbol} & Meaning \\
+  \midrule
+  x,\,y,\,z        & Position in world frame [m] \\
+  \phi              & Roll --- rotation about world $x$-axis [rad] \\
+  \theta            & Pitch --- rotation about world $y$-axis [rad] \\
+  \psi              & Yaw (heading) --- rotation about world $z$-axis [rad] \\
+  \omega_L,\,\omega_R & Wheel angular velocities [rad\,s$^{-1}$] \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Rotation Matrix (ZYX Convention)}
+
+Composing elementary rotations $R_z(\psi)\,R_y(\theta)\,R_x(\phi)$:
+
+\begin{equation}
+  R =
+  \begin{bmatrix}
+    \cps\cth & \cps\sth\sph - \sps\cph & \cps\sth\cph + \sps\sph \\
+    \sps\cth & \sps\sth\sph + \cps\cph & \sps\sth\cph - \cps\sph \\
+    -\sth    & \cth\sph                & \cth\cph
+  \end{bmatrix}
+  \tag{27}
+\end{equation}
+
+\subsection{World-Frame Translational Velocity}
+
+The robot moves at speed $v$ along its body $x$-axis:
+
+\begin{equation}
+  \begin{bmatrix}\dot x \\ \dot y \\ \dot z\end{bmatrix}
+  = v(t)\cdot R\,\eone
+  = v(t)\begin{bmatrix}\cps\cth \\ \sps\cth \\ -\sth\end{bmatrix}
+  \tag{28}
+\end{equation}
+
+On flat ground ($\theta=0$) this reduces exactly to the 2D equations.
+
+\subsection{Complete Discrete-Time State Update}
+
+Only $x$, $y$, $\psi$ are numerically integrated;
+the remaining three states are read from terrain model $h(x,y)$:
+
+\begin{equation}
+  \boxed{
+  \begin{aligned}
+    x_{k+1}      &= x_k      + v_k\,\cps_k\cth_k\,\Delta t \\
+    y_{k+1}      &= y_k      + v_k\,\sps_k\cth_k\,\Delta t \\
+    z_{k+1}      &= h(x_{k+1},\,y_{k+1}) \\
+    \phi_{k+1}   &= \phi_{\text{surface}}(x_{k+1},\,y_{k+1},\,\psi_{k+1}) \\
+    \theta_{k+1} &= \theta_{\text{surface}}(x_{k+1},\,y_{k+1},\,\psi_{k+1}) \\
+    \psi_{k+1}   &= \psi_k   + \dot\psi_k\,\Delta t
+  \end{aligned}
+  }
+  \tag{29}
+\end{equation}
+
+\noindent\textbf{Singularity warning:}
+The Euler angle parameterisation is undefined at $\theta = \pm90°$ (gimbal lock).
+For steep terrain, replace with unit quaternion
+$\mathbf{q} = (q_0,q_1,q_2,q_3)^\top$ and use
+$\dot{\mathbf{q}} = \tfrac{1}{2}\,\Xi(\mathbf{q})\,\bm\omega_b$.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\end{document}

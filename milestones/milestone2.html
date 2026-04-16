@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Milestone 2 — Frontier Exploration with Semantic Hazard Mapping</title>
+  <style>
+    :root {
+      --maroon: #8C1D40;
+      --gold:   #FFC627;
+      --dark:   #1a1a1a;
+      --text:   #2c2c2c;
+      --muted:  #666;
+      --bg:     #f9f9f9;
+      --card:   #ffffff;
+      --border: #e0e0e0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--maroon);
+      color: white;
+      padding: 0;
+    }
+    .header-top {
+      background: var(--dark);
+      padding: 10px 40px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-top span { color: var(--gold); font-size: 13px; font-weight: 600; letter-spacing: 1px; }
+    .header-body { padding: 48px 40px 40px; max-width: 1100px; margin: 0 auto; }
+    .header-body h1 { font-size: 2.2rem; font-weight: 700; margin-bottom: 8px; }
+    .header-body .sub { color: rgba(255,255,255,0.8); font-size: 1rem; }
+    .meta-pills { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+    .pill {
+      background: rgba(255,198,39,0.2);
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* ── Layout ── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 40px; }
+    .two-col { display: grid; grid-template-columns: 260px 1fr; gap: 40px; align-items: start; }
+
+    /* ── Sidebar TOC ── */
+    .toc {
+      position: sticky;
+      top: 24px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+    }
+    .toc h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
+    .toc a {
+      display: block;
+      padding: 6px 0;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 14px;
+      border-left: 2px solid transparent;
+      padding-left: 10px;
+      transition: all 0.2s;
+    }
+    .toc a:hover { border-left-color: var(--maroon); color: var(--maroon); }
+    .toc a.sub { padding-left: 22px; font-size: 13px; color: var(--muted); }
+
+    /* ── Content ── */
+    .content section { margin-bottom: 56px; }
+    .content h2 {
+      font-size: 1.6rem;
+      color: var(--maroon);
+      border-bottom: 3px solid var(--gold);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .content h3 { font-size: 1.15rem; color: var(--dark); margin: 24px 0 10px; font-weight: 600; }
+    .content p { margin-bottom: 14px; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .card h4 { font-size: 1rem; color: var(--maroon); margin-bottom: 8px; font-weight: 600; }
+
+    /* ── Evidence blocks ── */
+    .evidence {
+      background: #fff8e1;
+      border-left: 4px solid var(--gold);
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    .evidence strong { color: var(--maroon); }
+
+    /* ── Code ── */
+    pre {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 16px 0;
+    }
+    code { font-family: 'Consolas', 'Courier New', monospace; }
+    p code, li code {
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--maroon);
+    }
+
+    /* ── Images ── */
+    .img-block {
+      text-align: center;
+      margin: 20px 0;
+    }
+    .img-block img {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .img-block figcaption {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    /* ── Video ── */
+    .video-block {
+      margin: 20px 0;
+      text-align: center;
+    }
+    .video-block video {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .video-block p { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+    /* ── Hazard table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    th {
+      background: var(--maroon);
+      color: white;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+    }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    tr:nth-child(even) td { background: #fafafa; }
+
+    /* ── Layer badges ── */
+    .layer-badge {
+      display: inline-block;
+      background: var(--maroon);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin-right: 6px;
+    }
+
+    /* ── State machine ── */
+    .states {
+      display: flex;
+      gap: 0;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .state {
+      flex: 1;
+      min-width: 100px;
+      padding: 14px 10px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    .state:first-child { border-radius: 8px 0 0 8px; }
+    .state:last-child { border-radius: 0 8px 8px 0; }
+    .state.s1 { background: #f0f0f0; }
+    .state.s2 { background: #e1f5ee; color: #0F6E56; }
+    .state.s3 { background: #faeeda; color: #633806; }
+    .state.s4 { background: #eaf3de; color: #27500A; }
+    .state.s5 { background: #f0f0f0; }
+    .state .arrow {
+      position: absolute;
+      right: -10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #999;
+      font-size: 16px;
+      z-index: 1;
+    }
+
+    /* ── PDF links ── */
+    .pdf-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--text);
+      margin-bottom: 10px;
+      transition: border-color 0.2s;
+    }
+    .pdf-link:hover { border-color: var(--maroon); }
+    .pdf-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--maroon);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .pdf-link span { font-size: 14px; font-weight: 500; }
+
+    /* ── Progress bar ── */
+    .progress-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .progress-label { width: 160px; font-size: 13px; font-weight: 600; }
+    .progress-bar { flex: 1; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--maroon); border-radius: 4px; }
+    .progress-pct { font-size: 13px; color: var(--muted); width: 36px; text-align: right; }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--dark);
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      padding: 24px;
+      font-size: 13px;
+      margin-top: 60px;
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+
+    @media (max-width: 768px) {
+      .two-col { grid-template-columns: 1fr; }
+      .toc { display: none; }
+      .card-grid { grid-template-columns: 1fr; }
+      .page { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="header-top">
+    <span>ASU · RAS 598 · Mobile Robotics · Spring 2026</span>
+  </div>
+  <div class="header-body">
+    <h1>Milestone 2: Mid-Point Technical Proof</h1>
+    <p class="sub">Autonomous Frontier Exploration with Semantic Hazard Mapping — TurtleBot4 Lite</p>
+    <div class="meta-pills">
+      <span class="pill">Due: Apr 15, 2026</span>
+      <span class="pill">Weight: 10%</span>
+      <span class="pill">2500–3000 words</span>
+      <span class="pill">Team: PriColon · rmane2 · Mkondamu</span>
+    </div>
+  </div>
+</header>
+
+<!-- Page body -->
+<div class="page">
+  <div class="two-col">
+
+    <!-- Sidebar TOC -->
+    <aside>
+      <nav class="toc">
+        <h3>Contents</h3>
+        <a href="#overview">Overview</a>
+        <a href="#system">System Architecture</a>
+        <a href="#frontier">Frontier Explorer Node</a>
+        <a class="sub" href="#frontier-algo">Algorithm</a>
+        <a class="sub" href="#frontier-evidence">Evidence</a>
+        <a href="#hazard">Semantic Hazard Classifier</a>
+        <a class="sub" href="#hazard-layers">5-Layer Detection</a>
+        <a class="sub" href="#hazmat">HAZMAT Detection</a>
+        <a href="#coordinator">Behavior Coordinator</a>
+        <a class="sub" href="#states">State Machine</a>
+        <a class="sub" href="#safety">Safety Systems</a>
+        <a href="#launch">Launch System</a>
+        <a href="#rosbag">ROS Bag Recording</a>
+        <a href="#math">Mathematical Foundations</a>
+        <a href="#contributions">Team Contributions</a>
+        <a href="#next">Next Steps (M3)</a>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="content">
+
+      <!-- Overview -->
+      <section id="overview">
+        <h2>Overview</h2>
+        <p>
+          Milestone 2 documents our transition from system design (M1) to working implementation.
+          This milestone presents concrete evidence of three custom ROS2 nodes running on the
+          TurtleBot4 Lite hardware platform, a complete single-command launch system, and a
+          recorded ROS bag demonstrating live frontier exploration with semantic hazard classification.
+        </p>
+        <p>
+          Our system enables a TurtleBot4 Lite to autonomously explore unknown indoor environments,
+          detect and classify environmental hazards using camera, depth, LiDAR, and onboard sensors,
+          and navigate safely by avoiding dangerous frontier zones — all without human intervention.
+        </p>
+
+        <div class="card-grid">
+          <div class="card">
+            <h4>What we built</h4>
+            <ul style="padding-left:18px; font-size:14px; line-height:2">
+              <li><code>frontier_explorer_node.py</code></li>
+              <li><code>semantic_hazard_classifier_node.py</code></li>
+              <li><code>behavior_coordinator_node.py</code></li>
+              <li><code>exploration.launch.py</code></li>
+              <li>DeepHAZMAT YOLOv3-tiny integration</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>Evidence provided</h4>
+            <ul style="padding-left:18px; font-size:14px; line-height:2">
+              <li>Demo video — frontier exploration</li>
+              <li>RQT node graph — live system</li>
+              <li>ROS bag — full sensor recording</li>
+              <li>GitHub — all code pushed</li>
+              <li>Math PDFs — derivations</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- System Architecture -->
+      <section id="system">
+        <h2>System Architecture</h2>
+        <p>
+          The full exploration stack connects four primary subsystems: SLAM Toolbox builds
+          the occupancy map, the frontier explorer identifies exploration targets, the semantic
+          hazard classifier labels dangerous zones, and the behavior coordinator orchestrates
+          safe navigation through Nav2.
+        </p>
+
+        <div class="img-block">
+          <figure>
+            <img src="../assets/images/mermaid_milestone2.png"
+                 alt="System architecture Mermaid diagram showing node connections"/>
+            <figcaption>Figure 1 — Full system node graph generated from the running ROS2 stack</figcaption>
+          </figure>
+        </div>
+
+        <div class="img-block">
+          <figure>
+            <img src="../assets/images/rqt_graph_active_Milestone2.png"
+                 alt="RQT graph showing active nodes and topic connections"/>
+            <figcaption>Figure 2 — RQT graph captured during live frontier exploration run on TurtleBot4 Lite</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- Frontier Explorer -->
+      <section id="frontier">
+        <h2>Frontier Explorer Node</h2>
+        <p>
+          The frontier explorer node (<code>frontier_explorer_node.py</code>), developed by
+          Princess Colon, implements the core exploration strategy. It continuously processes
+          the SLAM occupancy map to identify unexplored regions and publishes ranked navigation
+          targets to the behavior coordinator.
+        </p>
+
+        <h3 id="frontier-algo">Algorithm</h3>
+        <p>
+          The node subscribes to <code>/map</code> (OccupancyGrid from slam_toolbox) and
+          <code>/odometry/filtered</code> (EKF-filtered pose). Every time a new map arrives,
+          the following pipeline executes:
+        </p>
+
+        <div class="card">
+          <h4>Frontier Detection Pipeline</h4>
+          <ol style="padding-left:20px; font-size:14px; line-height:2.2">
+            <li><strong>Cell scanning</strong> — iterate all free cells (value=0) in the OccupancyGrid</li>
+            <li><strong>Frontier test</strong> — a free cell is a frontier if its 3×3 kernel contains at least one unknown cell (value=−1) and no occupied cells (value=100)</li>
+            <li><strong>Clustering</strong> — connected frontier cells are grouped using <code>scipy.ndimage.label()</code> with a 3×3 structure element; clusters smaller than <code>min_cluster_size=10</code> are discarded as noise</li>
+            <li><strong>Scoring</strong> — each cluster is ranked by: <code>score = (α × size + β × unknown_near) / (dist + ε)</code></li>
+            <li><strong>Publishing</strong> — sorted PoseArray published to <code>/frontier_goals</code>; MarkerArray to <code>/frontier_markers</code> for RViz2 visualization</li>
+          </ol>
+        </div>
+
+        <p>
+          The scoring formula balances three competing objectives: <em>size</em> rewards larger
+          unknown regions, <em>unknown_near</em> rewards frontiers surrounded by more undiscovered
+          space (maximizing information gain), and <em>dist</em> penalizes faraway frontiers to
+          minimize unnecessary travel. The parameters α=1.0 and β=2.0 weight unknown area discovery
+          twice as heavily as cluster size, reflecting the goal of maximizing map coverage.
+        </p>
+
+        <h3 id="frontier-evidence">Evidence</h3>
+
+        <div class="video-block">
+          <video controls preload="metadata">
+            <source src="../assets/videos/Frontier_Explorer_Node_Demo.mp4" type="video/mp4"/>
+            Your browser does not support the video tag.
+          </video>
+          <p>Video 1 — Frontier Explorer Node running on TurtleBot4 Lite. The robot autonomously
+          selects and navigates to frontier goals while building the SLAM map in real time.</p>
+        </div>
+
+        <div class="evidence">
+          <strong>ROS Topics active during recording:</strong>
+          <code>/map</code> · <code>/frontier_goals</code> · <code>/frontier_markers</code> ·
+          <code>/odometry/filtered</code> · <code>/scan</code>
+        </div>
+      </section>
+
+      <!-- Semantic Hazard Classifier -->
+      <section id="hazard">
+        <h2>Semantic Hazard Classifier Node</h2>
+        <p>
+          The semantic hazard classifier (<code>semantic_hazard_classifier_node.py</code>)
+          is the core contribution of this milestone from Manjunath Kondamu. It runs at 10 Hz
+          and processes data from five independent sensor layers simultaneously, fusing
+          their outputs into a single hazard classification that is published to the robot's
+          semantic map.
+        </p>
+        <p>
+          The term "semantic" refers to attaching meaningful labels to spatial regions rather
+          than simply marking them as occupied or free. Where a standard occupancy grid treats
+          a wall and a fire identically, our semantic map distinguishes between CLEAR, DEBRIS,
+          SMOKE, WATER, DARK, NARROW, POTHOLE, GLASS, HAZMAT, FIRE, and CLIFF zones —
+          enabling the behavior coordinator to make informed navigation decisions.
+        </p>
+
+        <h3 id="hazard-layers">5-Layer Detection Architecture</h3>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Sensor</th>
+              <th>Topic</th>
+              <th>Detects</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="layer-badge">L1</span> Hardware</td>
+              <td>Create3 sensors</td>
+              <td><code>/hazard_detection</code><br/><code>/slip_status</code></td>
+              <td>CLIFF (type=2), BUMP (type=1), wheel slip → WATER</td>
+            </tr>
+            <tr>
+              <td><span class="layer-badge">L2</span> RGB Camera</td>
+              <td>OAK-D RGB</td>
+              <td><code>/oakd/rgb/preview/image_raw</code></td>
+              <td>FIRE (orange/red HSV), WATER (blue/shiny), SMOKE (low saturation), HAZMAT (yellow diamond cue), DEBRIS (high Canny edge density), DARK (brightness &lt;45)</td>
+            </tr>
+            <tr>
+              <td><span class="layer-badge">L3</span> Depth</td>
+              <td>OAK-D stereo</td>
+              <td><code>/oakd/rgb/preview/depth</code></td>
+              <td>POTHOLE (floor depth &gt;1.5 m), GLASS (NaN ratio &gt;50%), unstable terrain (depth variance &gt;0.35)</td>
+            </tr>
+            <tr>
+              <td><span class="layer-badge">L4</span> LiDAR</td>
+              <td>RPLIDAR A1M8</td>
+              <td><code>/scan</code></td>
+              <td>NARROW (both sides &lt;0.35 m), DEAD_END (front + sides blocked), front obstacle &lt;0.25 m</td>
+            </tr>
+            <tr>
+              <td><span class="layer-badge">L5</span> HAZMAT YOLO</td>
+              <td>OAK-D RGB</td>
+              <td><code>/oakd/rgb/preview/image_raw</code></td>
+              <td>13 HAZMAT sign classes via DeepHAZMAT YOLOv3-tiny (confidence &gt;0.5)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Hazard Priority Fusion</h3>
+        <p>
+          All five layers run in parallel every 100 ms. Their detections are collected into
+          a list and passed to <code>fuse_hazards()</code>, which selects the single
+          highest-priority hazard using a predefined severity scale:
+        </p>
+        <pre><code>HAZARD_PRIORITY = {
+    'CLIFF':    100,   # immediate physical danger
+    'FIRE':     100,   # immediate physical danger
+    'POTHOLE':  90,    # structural floor hazard
+    'GLASS':    85,    # invisible obstacle
+    'HAZMAT':   85,    # chemical/biological risk
+    'WATER':    80,    # slippery surface / flooding
+    'DEAD_END': 80,    # navigation trap
+    'NARROW':   70,    # passage risk
+    'SMOKE':    60,    # visibility / air quality
+    'DARK':     60,    # unknown danger
+    'DEBRIS':   40,    # passable but cautious
+    'CLEAR':    0,
+}</code></pre>
+
+        <p>
+          Critical hazards (CLIFF, FIRE, POTHOLE, HAZMAT) trigger an immediate
+          E-stop by publishing <code>True</code> to <code>/exploration/stop</code>, halting
+          the behavior coordinator and zeroing the velocity command.
+        </p>
+
+        <h3 id="hazmat">DeepHAZMAT Integration</h3>
+        <p>
+          Layer 5 integrates the DeepHAZMAT framework (Najafi et al., 2021), which uses a
+          YOLOv3-tiny architecture trained on the HAZMAT-13 dataset containing 52,845 images
+          across 13 hazardous material sign categories. The model was selected specifically
+          for its design under restricted computational resources — matching the constraints
+          of the Raspberry Pi 4 (2 GB RAM) aboard the TurtleBot4 Lite.
+        </p>
+
+        <div class="card-grid">
+          <div class="card">
+            <h4>13 HAZMAT Classes Detected</h4>
+            <p style="font-size:13px; color: var(--muted); line-height:1.9">
+              Poison · Flammable · Flammable Solid · Oxidizer · Explosive ·
+              Corrosive · Radioactive · Dangerous · Non-Flammable Gas ·
+              Infectious · Organic Peroxide · Inhalation Hazard ·
+              Spontaneously Combustible
+            </p>
+          </div>
+          <div class="card">
+            <h4>Implementation Status</h4>
+            <div class="progress-row">
+              <span class="progress-label">Library installed</span>
+              <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+              <span class="progress-pct">✅</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">Weights integrated</span>
+              <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+              <span class="progress-pct">✅</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">Sample image test</span>
+              <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+              <span class="progress-pct">✅</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">Robot camera test</span>
+              <div class="progress-bar"><div class="progress-fill" style="width:60%"></div></div>
+              <span class="progress-pct">M3</span>
+            </div>
+          </div>
+        </div>
+
+        <h3>DeepHAZMAT Detection — Evidence</h3>
+        <p>
+          The following screenshots demonstrate DeepHAZMAT YOLOv3-tiny running on
+          sample HAZMAT images, confirming successful detection and bounding box
+          generation prior to robot camera integration.
+        </p>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px; margin: 16px 0;">
+          <div class="img-block">
+            <figure>
+              <img src="../assets/images/ss2.png" alt="DeepHAZMAT detection screenshot 1"/>
+              <figcaption>HAZMAT sign detected — bounding box with class label</figcaption>
+            </figure>
+          </div>
+          <div class="img-block">
+            <figure>
+              <img src="../assets/images/ss3.png" alt="DeepHAZMAT detection screenshot 2"/>
+              <figcaption>Multi-class HAZMAT detection output</figcaption>
+            </figure>
+          </div>
+          <div class="img-block">
+            <figure>
+              <img src="../assets/images/ss4.png" alt="DeepHAZMAT detection screenshot 3"/>
+              <figcaption>GrabCut segmentation on detected HAZMAT region</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <h3>Outputs</h3>
+        <p>The classifier publishes to three topics simultaneously:</p>
+        <ul style="padding-left:20px; font-size:14px; line-height:2.2; margin-bottom:14px">
+          <li><code>/semantic_map</code> — OccupancyGrid where cell values encode hazard severity (0=CLEAR, 30=DEBRIS, 85=HAZMAT, 100=FIRE/CLIFF)</li>
+          <li><code>/hazard_alert</code> — String with current highest-priority hazard name</li>
+          <li><code>/hazard_markers</code> — MarkerArray of colored 3D cubes for RViz2 visualization</li>
+        </ul>
+      </section>
+
+      <!-- Behavior Coordinator -->
+      <section id="coordinator">
+        <h2>Behavior Coordinator Node</h2>
+        <p>
+          The behavior coordinator (<code>behavior_coordinator_node.py</code>) is the
+          decision-making brain of the exploration system. It integrates the outputs of
+          both the frontier explorer and the semantic hazard classifier to select safe
+          navigation goals and drive the robot to full map coverage.
+        </p>
+
+        <h3 id="states">5-State Machine</h3>
+
+        <div class="states">
+          <div class="state s1">IDLE<span class="arrow">›</span></div>
+          <div class="state s2">SELECTING<span class="arrow">›</span></div>
+          <div class="state s3">NAVIGATING<span class="arrow">›</span></div>
+          <div class="state s4">ARRIVED<span class="arrow">›</span></div>
+          <div class="state s5">DONE</div>
+        </div>
+
+        <div class="card-grid">
+          <div class="card">
+            <h4>IDLE</h4>
+            <p style="font-size:13px">Waits for first <code>/frontier_goals</code> message. Transitions to SELECTING immediately on receipt.</p>
+          </div>
+          <div class="card">
+            <h4>SELECTING</h4>
+            <p style="font-size:13px">Iterates the ranked frontier list. Skips frontiers within 0.3 m of previously visited points, and skips any frontier whose map cell has a semantic value ≥70 (WATER or above). Sends the first valid goal to Nav2.</p>
+          </div>
+          <div class="card">
+            <h4>NAVIGATING</h4>
+            <p style="font-size:13px">Monitors the active Nav2 <code>NavigateToPose</code> action. On success → ARRIVED. On failure → increments counter; after 3 consecutive failures marks the frontier unreachable and returns to SELECTING.</p>
+          </div>
+          <div class="card">
+            <h4>ARRIVED</h4>
+            <p style="font-size:13px">Records the reached position in the visited list, resets the failure counter, and immediately transitions back to SELECTING to pick the next frontier.</p>
+          </div>
+        </div>
+
+        <p>
+          When no valid frontiers remain (all visited or all hazardous), the node transitions
+          to <strong>DONE</strong>, publishes a zero velocity command, and emits
+          <code>EXPLORATION_COMPLETE</code> on <code>/exploration/status</code>.
+        </p>
+
+        <h3 id="safety">Safety Systems</h3>
+
+        <table>
+          <thead>
+            <tr><th>Safety Trigger</th><th>Condition</th><th>Response</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Battery E-stop</td>
+              <td>Battery percentage &lt; 15%</td>
+              <td>Cancel Nav2 goal · zero velocity · transition to DONE</td>
+            </tr>
+            <tr>
+              <td>Cliff E-stop</td>
+              <td><code>/hazard_detection</code> type=2 while NAVIGATING</td>
+              <td>Cancel goal · zero velocity · return to SELECTING</td>
+            </tr>
+            <tr>
+              <td>Operator kill</td>
+              <td><code>/exploration/stop</code> = True</td>
+              <td>Immediate stop · transition to DONE</td>
+            </tr>
+            <tr>
+              <td>Deadman switch</td>
+              <td><code>/frontier_goals</code> stale &gt;5 s</td>
+              <td>Zero velocity · return to IDLE</td>
+            </tr>
+            <tr>
+              <td>Nav2 failure limit</td>
+              <td>3 consecutive goal failures</td>
+              <td>Mark frontier unreachable · try next frontier</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Launch System -->
+      <section id="launch">
+        <h2>Launch System</h2>
+        <p>
+          The entire exploration stack launches with a single command via
+          <code>exploration.launch.py</code>. The launch file starts all subsystems
+          in the correct order with appropriate delays:
+        </p>
+        <pre><code>ros2 launch frontier_exploration_mapping exploration.launch.py</code></pre>
+
+        <div class="card">
+          <h4>Launch sequence</h4>
+          <ol style="padding-left:20px; font-size:14px; line-height:2.2">
+            <li><strong>slam_toolbox</strong> — async SLAM in mapping mode (resolution 0.05 m)</li>
+            <li><strong>robot_localization EKF</strong> — fuses wheel odometry + IMU → <code>/odometry/filtered</code></li>
+            <li><strong>Nav2</strong> — costmap, path planner (NavFn), DWA local controller</li>
+            <li><strong>frontier_explorer_node</strong> — starts immediately after Nav2</li>
+            <li><strong>semantic_hazard_classifier_node</strong> — starts immediately</li>
+            <li><strong>behavior_coordinator_node</strong> — delayed 5 s to allow SLAM and Nav2 to initialize</li>
+          </ol>
+        </div>
+
+        <p>
+          The <code>use_sim_time:=true</code> argument switches all nodes to Gazebo simulation
+          time for testing, while the default <code>false</code> uses hardware time for
+          deployment on the physical TurtleBot4 Lite.
+        </p>
+      </section>
+
+      <!-- ROS Bag -->
+      <section id="rosbag">
+        <h2>ROS Bag Recording</h2>
+        <p>
+          A complete ROS bag was recorded during the frontier exploration demo run.
+          The bag captures all sensor and algorithmic topics required for post-analysis
+          and replay.
+        </p>
+
+        <div class="evidence">
+          <strong>Bag file:</strong> <code>rosbag_full_frontier_functional</code><br/>
+          <strong>Format:</strong> MCAP · <strong>Location:</strong> <code>ros2_ws/rosbags/</code><br/>
+          <strong>Topics recorded:</strong> <code>/map</code> · <code>/scan</code> · <code>/odom</code> ·
+          <code>/odometry/filtered</code> · <code>/frontier_goals</code> · <code>/frontier_markers</code> ·
+          <code>/oakd/rgb/preview/image_raw</code> · <code>/oakd/rgb/preview/depth</code> ·
+          <code>/tf</code> · <code>/tf_static</code>
+        </div>
+
+        <p>To replay the bag:</p>
+        <pre><code>ros2 bag play ros2_ws/rosbags/rosbag_full_frontier_functional</code></pre>
+      </section>
+
+      <!-- Math -->
+      <section id="math">
+        <h2>Mathematical Foundations</h2>
+        <p>
+          The mathematical derivations supporting all algorithmic decisions in this system
+          were compiled by Rohit Mane and are provided in full as LaTeX-formatted documents.
+          Key derivations include the frontier scoring function, EKF state estimation equations,
+          differential drive kinematics, occupancy grid Bayesian update rules, and the HSV
+          threshold derivations for the semantic classifier.
+        </p>
+
+        <a class="pdf-link" href="../math/Milestone 2_ Latex Documentation - Part 1-1.pdf" target="_blank">
+          <div class="pdf-icon">PDF</div>
+          <span>Milestone 2 — Mathematical Documentation Part 1</span>
+        </a>
+        <a class="pdf-link" href="../math/Milestone 2_ Latex Documentation_Part 2.pdf" target="_blank">
+          <div class="pdf-icon">PDF</div>
+          <span>Milestone 2 — Mathematical Documentation Part 2</span>
+        </a>
+      </section>
+
+      <!-- Contributions -->
+      <section id="contributions">
+        <h2>Team Contributions</h2>
+        <p>The following table documents the specific technical contributions of each team member for Milestone 2.</p>
+        <table>
+          <thead>
+            <tr><th>Team Member</th><th>Role</th><th>M2 Contributions</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Princess Colon</strong><br/><code style="font-size:12px">PriColon</code></td>
+              <td>Frontier Exploration Lead</td>
+              <td>
+                <code>frontier_explorer_node.py</code> — full implementation ·
+                SLAM on TurtleBot4 Lite hardware ·
+                ROS bag recording · Demo video ·
+                RViz2 config · RQT node graph · System architecture diagram
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Rohit Mane</strong><br/><code style="font-size:12px">rmane2</code></td>
+              <td>Mathematical Foundations</td>
+              <td>
+                Frontier scoring formula derivation ·
+                EKF prediction and update equations ·
+                Differential drive kinematics proof ·
+                Occupancy grid Bayesian update ·
+                HSV threshold derivations ·
+                DWA planner velocity constraints ·
+                LaTeX documentation Parts 1 &amp; 2
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Manjunath Kondamu</strong><br/><code style="font-size:12px">Mkondamu</code></td>
+              <td>Hazard Mapping &amp; Integration</td>
+              <td>
+                <code>semantic_hazard_classifier_node.py</code> — 5-layer detection ·
+                DeepHAZMAT YOLOv3-tiny integration ·
+                <code>behavior_coordinator_node.py</code> — 5-state machine ·
+                <code>exploration.launch.py</code> — single-command launch ·
+                YOLO weights packaged into ROS2 workspace ·
+                Milestone 2 website
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Next Steps -->
+      <section id="next">
+        <h2>Next Steps — Milestone 3</h2>
+
+        <div class="card-grid">
+          <div class="card">
+            <h4>Hardware validation</h4>
+            <p style="font-size:13px">Run the full autonomous exploration stack on the physical TurtleBot4 Lite in a disaster-scenario test environment with placed HAZMAT signs, debris, and simulated water hazards.</p>
+          </div>
+          <div class="card">
+            <h4>HAZMAT on robot camera</h4>
+            <p style="font-size:13px">Complete end-to-end testing of DeepHAZMAT YOLOv3-tiny running on the OAK-D RGB feed from the TurtleBot4 Lite at real-time inference speeds.</p>
+          </div>
+          <div class="card">
+            <h4>Semantic map persistence</h4>
+            <p style="font-size:13px">Merge the semantic hazard OccupancyGrid with the SLAM map so that hazard labels persist across the full explored area rather than just the camera's current field of view.</p>
+          </div>
+          <div class="card">
+            <h4>idsia-robotics dataset evaluation</h4>
+            <p style="font-size:13px">Evaluate our HSV classifier against the Hazards&amp;Robots dataset (324k frames, 20 anomaly classes) to quantify detection accuracy and tune thresholds for M3.</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<footer>
+  <p>RAS 598: Mobile Robotics · Spring 2026 · Arizona State University ·
+    <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank">GitHub Repository</a>
+  </p>
+</footer>
+
+</body>
+</html>
