@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'frontier_exploration_mapping'
 
@@ -16,13 +18,9 @@ setup(
     zip_safe=True,
     maintainer='Group 1',
     maintainer_email='picolon@asu.edu',
-    description='',
+    description='Autonomous Frontier Exploration with Semantic Hazard Mapping',
     license='Apache-2.0',
-    extras_require={
-        'test': [
-            'pytest',
-        ],
-    },
+    extras_require={'test': ['pytest']},
     entry_points={
         'console_scripts': [
             'frontier_explorer_node = frontier_exploration_mapping.frontier_explorer_node:main',
