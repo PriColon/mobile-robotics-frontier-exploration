@@ -6,17 +6,7 @@
 <title>Autonomous Frontier Exploration — RAS 598 · ASU</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
-
-:root {
-  --maroon:#8C1D40; --maroon-dark:#6B1530; --maroon-light:#B5244E;
-  --gold:#FFC627; --gold-dark:#E0A800; --gold-light:#FFD966;
-  --white:#FFFFFF; --off-white:#FAFAF8;
-  --gray-50:#F7F6F3; --gray-100:#EDEBE5; --gray-200:#D5D2C8;
-  --gray-400:#9A9488; --gray-600:#5C5750; --gray-800:#2E2B26;
-  --text:#1A1814; --text-muted:#6B6560; --border:#E0DDD5;
-  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.04);
-  --shadow-lg:0 8px 32px rgba(0,0,0,0.10);
-}
+:root{--maroon:#8C1D40;--maroon-dark:#6B1530;--maroon-light:#B5244E;--gold:#FFC627;--gold-dark:#E0A800;--gold-light:#FFD966;--white:#FFFFFF;--off-white:#FAFAF8;--gray-50:#F7F6F3;--gray-100:#EDEBE5;--gray-200:#D5D2C8;--gray-400:#9A9488;--gray-600:#5C5750;--gray-800:#2E2B26;--text:#1A1814;--text-muted:#6B6560;--border:#E0DDD5;--shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.04);--shadow-lg:0 8px 32px rgba(0,0,0,0.10);}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
 body{font-family:'Source Sans 3',sans-serif;background:var(--off-white);color:var(--text);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased;}
@@ -24,9 +14,15 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(140,29,64,0.
 .nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
 .nav-logo{width:30px;height:30px;background:var(--gold);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:var(--maroon);}
 .nav-title{font-size:13px;font-weight:600;color:rgba(255,255,255,0.9);letter-spacing:0.02em;}
-.nav-links{display:flex;list-style:none;}
-.nav-links a{display:block;padding:0 14px;height:56px;line-height:56px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.75);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;transition:color 0.2s;}
-.nav-links a:hover,.nav-links a.active{color:var(--gold);}
+.nav-links{display:flex;list-style:none;align-items:center;}
+.nav-links > li > a{display:block;padding:0 14px;height:56px;line-height:56px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.75);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;transition:color 0.2s;}
+.nav-links > li > a:hover{color:var(--gold);}
+.nav-dropdown{position:relative;}
+.nav-dropdown-menu{display:none;position:absolute;top:56px;left:0;background:rgba(107,21,48,0.99);backdrop-filter:blur(12px);border:1px solid rgba(255,198,39,0.2);border-radius:0 0 8px 8px;min-width:210px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.2);}
+.nav-dropdown:hover .nav-dropdown-menu{display:block;}
+.nav-dropdown-menu a{display:block;padding:10px 18px;height:auto;line-height:1.4;font-size:12px;font-weight:500;color:rgba(255,255,255,0.75);text-decoration:none;text-transform:none;letter-spacing:0.02em;transition:background 0.15s,color 0.15s;border-bottom:1px solid rgba(255,255,255,0.06);}
+.nav-dropdown-menu a:last-child{border-bottom:none;border-radius:0 0 8px 8px;}
+.nav-dropdown-menu a:hover{background:rgba(255,198,39,0.1);color:var(--gold);}
 .container{max-width:1060px;margin:0 auto;}
 section{padding:80px 2rem;}
 .section-eyebrow{font-size:11px;font-weight:600;color:var(--maroon);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
@@ -42,7 +38,6 @@ footer{background:var(--maroon-dark);padding:40px 2rem;text-align:center;}
 .footer-links a{font-size:12px;color:rgba(255,198,39,0.7);text-decoration:none;transition:color 0.2s;}
 .footer-links a:hover{color:var(--gold);}
 @media(max-width:768px){.nav-links{display:none;}}
-
 /* HERO */
 .hero{min-height:100vh;background:var(--maroon);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 2rem 80px;position:relative;overflow:hidden;}
 .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 100%,rgba(255,198,39,0.12) 0%,transparent 70%),radial-gradient(ellipse 40% 40% at 20% 20%,rgba(255,255,255,0.04) 0%,transparent 60%);}
@@ -108,7 +103,7 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
 .timeline-item:last-child{margin-bottom:0;}
 .timeline-dot{position:absolute;left:-34px;top:8px;width:16px;height:16px;border-radius:50%;border:2.5px solid var(--white);}
 .timeline-dot.done{background:var(--maroon);box-shadow:0 0 0 2px var(--maroon);}
-.timeline-dot.upcoming{background:var(--white);box-shadow:0 0 0 2px var(--maroon);}
+.timeline-dot.submitted{background:var(--gold-dark);box-shadow:0 0 0 2px var(--gold-dark);}
 .timeline-dot.future{background:var(--gray-200);box-shadow:0 0 0 2px var(--gray-200);}
 .timeline-card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:24px 28px;box-shadow:var(--shadow);transition:box-shadow 0.2s;}
 .timeline-card:hover{box-shadow:var(--shadow-lg);}
@@ -117,16 +112,21 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
 .timeline-sub{font-size:12px;color:var(--text-muted);margin-top:2px;}
 .ms-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px;white-space:nowrap;}
 .ms-badge.done{background:#E8F5E9;color:#2E7D32;}
-.ms-badge.upcoming{background:rgba(140,29,64,0.08);color:var(--maroon);}
+.ms-badge.submitted{background:#FFF8E1;color:#856404;}
 .ms-badge.future{background:var(--gray-100);color:var(--gray-600);}
 .timeline-body{font-size:13.5px;color:var(--text-muted);font-weight:300;margin-bottom:16px;}
 .timeline-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;}
 .tag{font-size:11px;font-weight:500;background:var(--gray-50);border:1px solid var(--border);color:var(--text-muted);padding:3px 10px;border-radius:100px;}
-.timeline-meta{display:flex;gap:20px;padding-top:14px;border-top:1px solid var(--border);}
+.timeline-meta{display:flex;gap:16px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;align-items:center;}
 .timeline-meta-item{font-size:12px;color:var(--text-muted);}
 .timeline-meta-item strong{color:var(--text);font-weight:600;}
-.ms-link{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--maroon);text-decoration:none;margin-left:auto;}
-.ms-link:hover{text-decoration:underline;}
+.ms-links{display:flex;gap:12px;margin-left:auto;align-items:center;flex-wrap:wrap;}
+.ms-link{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--maroon);text-decoration:none;padding:4px 10px;background:rgba(140,29,64,0.06);border-radius:6px;transition:background 0.15s;}
+.ms-link:hover{background:rgba(140,29,64,0.12);}
+.ms-link.gold{color:var(--gold-dark);background:rgba(224,168,0,0.08);}
+.ms-link.gold:hover{background:rgba(224,168,0,0.15);}
+.ms-link.blue{color:#1a5276;background:rgba(26,82,118,0.08);}
+.ms-link.blue:hover{background:rgba(26,82,118,0.14);}
 /* TEAM */
 #team{background:var(--white);}
 .team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
@@ -162,7 +162,7 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
 .dl-btn{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;text-decoration:none;margin-right:3px;}
 .dl-zip{background:#E8F5E9;color:#2E7D32;}
 .dl-tar{background:rgba(140,29,64,0.08);color:var(--maroon);}
-/* PROGRESS / GANTT */
+/* PROGRESS */
 #progress{background:var(--white);}
 .gantt-embed-wrap{border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-lg);}
 .gantt-embed-header{padding:14px 24px;background:var(--maroon);display:flex;align-items:center;justify-content:space-between;}
@@ -190,27 +190,35 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
     <li><a href="#mission">Mission</a></li>
     <li><a href="#architecture">Architecture</a></li>
     <li><a href="#sensors">Sensors</a></li>
-    <li><a href="#milestones">Milestones</a></li>
+    <li class="nav-dropdown">
+      <a href="#milestones">Milestones ▾</a>
+      <div class="nav-dropdown-menu">
+        <a href="#milestones">↓ Timeline overview</a>
+        <a href="milestones/milestone1.html">M1 — Proposal</a>
+        <a href="milestones/milestone2.html">M2 — Technical Proof</a>
+        <a href="math/m2-mathematics.html">M2 — Mathematics</a>
+        <a href="math/mathematics_merged.tex" target="_blank">Math LaTeX (.tex) ↗</a>
+      </div>
+    </li>
     <li><a href="#team">Team</a></li>
     <li><a href="#stats">Stats</a></li>
     <li><a href="#progress">Progress</a></li>
   </ul>
 </nav>
 
-<!-- HERO -->
 <section class="hero" id="home">
   <div class="hero-grid"></div>
   <div class="hero-eyebrow">RAS 598: Mobile Robotics · ASU Spring 2026</div>
   <h1>Autonomous Frontier Exploration<br/>with <span>Semantic Hazard Mapping</span></h1>
-  <p class="hero-sub">A TurtleBot4 that builds its own map, classifies hazards in real-time, and navigates unknown environments — entirely from scratch.</p>
+  <p class="hero-sub">A TurtleBot4 Lite that builds its own map, classifies hazards in real-time, and navigates unknown environments — entirely without a prior map.</p>
   <div class="hero-meta">
     <div class="hero-meta-item"><div class="label">Platform</div><div class="value">TurtleBot4 Lite</div></div>
     <div class="hero-divider"></div>
-    <div class="hero-meta-item"><div class="label">Framework</div><div class="value">ROS2 Humble</div></div>
+    <div class="hero-meta-item"><div class="label">Framework</div><div class="value">ROS2 Jazzy</div></div>
     <div class="hero-divider"></div>
     <div class="hero-meta-item"><div class="label">Goal Coverage</div><div class="value">≥ 80% Floor Area</div></div>
     <div class="hero-divider"></div>
-    <div class="hero-meta-item"><div class="label">Repository</div><div class="value">GitHub ↗</div></div>
+    <div class="hero-meta-item"><div class="label">Custom Nodes</div><div class="value">3 Built</div></div>
   </div>
   <div class="hero-ctas">
     <a class="btn-primary" href="#milestones">View Milestones</a>
@@ -219,7 +227,6 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
   <div class="hero-scroll"><span>Scroll</span><div class="scroll-arrow"></div></div>
 </section>
 
-<!-- MISSION -->
 <section id="mission">
   <div class="container">
     <div class="fade-in">
@@ -230,19 +237,18 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
       <div class="mission-text">
         <p>Standard mobile robot deployments require a pre-built map before autonomous navigation is possible. This creates a chicken-and-egg problem in unknown or dynamically changed environments.</p>
         <p>Our system solves this by combining frontier-based exploration with semantic awareness — the robot builds, classifies, and navigates its environment simultaneously from scratch, with no prior map and no human guidance.</p>
-        <p>The robot semantically classifies regions as <strong>Clear</strong>, <strong>Cluttered</strong>, or <strong>Hazardous</strong> using its OAK-D RGB-D camera, producing a labeled occupancy map as output.</p>
+        <p>The robot semantically classifies regions as <strong>Clear</strong>, <strong>Debris</strong>, or <strong>Hazardous</strong> using its OAK-D RGB-D camera, RPLIDAR, and onboard Create3 sensors, producing a labeled occupancy map as output.</p>
       </div>
       <div class="mission-stats">
         <div class="stat-card fade-in"><div class="stat-num">80<span class="stat-unit">%</span></div><div class="stat-label">Target floor coverage</div></div>
         <div class="stat-card fade-in"><div class="stat-num">3</div><div class="stat-label">Custom ROS2 nodes</div></div>
-        <div class="stat-card fade-in"><div class="stat-num">0.2<span class="stat-unit">m/s</span></div><div class="stat-label">Max velocity (safe)</div></div>
+        <div class="stat-card fade-in"><div class="stat-num">5</div><div class="stat-label">Hazard detection layers</div></div>
         <div class="stat-card fade-in"><div class="stat-num">5<span class="stat-unit">s</span></div><div class="stat-label">Deadman switch timeout</div></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ARCHITECTURE -->
 <section id="architecture">
   <div class="container">
     <div class="fade-in">
@@ -272,12 +278,12 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
     </div>
   </div>
 </section>
+
 <div class="lightbox" id="lightbox" onclick="this.classList.remove('active')">
-  <button class="lightbox-close" onclick="document.getElementById('lightbox').classList.remove('active')">✕</button>
+  <button class="lightbox-close" onclick="event.stopPropagation();document.getElementById('lightbox').classList.remove('active')">✕</button>
   <img src="assets/images/architecture.png" alt="Architecture Zoomed"/>
 </div>
 
-<!-- SENSORS -->
 <section id="sensors">
   <div class="container">
     <div class="fade-in">
@@ -289,27 +295,27 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
       <table>
         <thead><tr><th>Sensor</th><th>Model</th><th>ROS2 Topic</th><th>Purpose</th></tr></thead>
         <tbody>
-          <tr><td>2D LiDAR</td><td>RPLIDAR A1M8</td><td><span class="topic-badge">/scan</span></td><td>SLAM map building, obstacle detection</td></tr>
-          <tr><td>RGB-D Camera</td><td>Luxonis OAK-D</td><td><span class="topic-badge">/oakd/rgb/preview/image_raw</span></td><td>Semantic region classification</td></tr>
-          <tr><td>Stereo Depth</td><td>OAK-D stereo pair</td><td><span class="topic-badge">/oakd/stereo/image_raw</span></td><td>Depth-based hazard detection</td></tr>
-          <tr><td>IMU (Create3)</td><td>Built-in ICM-42670</td><td><span class="topic-badge">/imu</span></td><td>Orientation, EKF fusion</td></tr>
-          <tr><td>IMU (OAK-D)</td><td>Built-in IMU</td><td><span class="topic-badge">/oakd/imu/data</span></td><td>Secondary orientation source</td></tr>
-          <tr><td>Wheel Encoders</td><td>Create3 built-in</td><td><span class="topic-badge">/odom</span></td><td>Primary distance measurement</td></tr>
+          <tr><td>2D LiDAR</td><td>RPLIDAR A1M8</td><td><span class="topic-badge">/scan</span></td><td>SLAM map building, narrow passage & dead-end detection</td></tr>
+          <tr><td>RGB Camera</td><td>Luxonis OAK-D</td><td><span class="topic-badge">/oakd/rgb/preview/image_raw</span></td><td>Visual hazard classification — fire, water, smoke, debris</td></tr>
+          <tr><td>Stereo Depth</td><td>OAK-D stereo pair</td><td><span class="topic-badge">/oakd/rgb/preview/depth</span></td><td>Pothole and glass wall detection via depth discontinuity</td></tr>
+          <tr><td>IMU</td><td>Create3 built-in ICM-42670</td><td><span class="topic-badge">/imu</span></td><td>Orientation for EKF fusion</td></tr>
+          <tr><td>Cliff Sensors</td><td>Create3 built-in (×4)</td><td><span class="topic-badge">/hazard_detection</span></td><td>Edge and drop-off detection — triggers E-stop</td></tr>
+          <tr><td>Wheel Encoders</td><td>Create3 built-in</td><td><span class="topic-badge">/odom</span></td><td>Primary odometry source for EKF</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 </section>
 
-<!-- MILESTONES -->
 <section id="milestones">
   <div class="container">
     <div class="fade-in">
       <div class="section-eyebrow">Timeline</div>
       <h2 class="section-title">Project milestones</h2>
-      <p class="section-desc">Three milestones across Spring 2026, from proposal to scientific dossier.</p>
+      <p class="section-desc">Three milestones across Spring 2026 — from proposal to scientific dossier.</p>
     </div>
     <div class="timeline fade-in">
+
       <div class="timeline-item">
         <div class="timeline-dot done"></div>
         <div class="timeline-card">
@@ -317,32 +323,43 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
             <div><div class="timeline-title">Milestone 1 — Proposal & Architecture</div><div class="timeline-sub">Mar 6, 2026 · 5% weight · ~1,500 words</div></div>
             <span class="ms-badge done">✓ Submitted</span>
           </div>
-          <div class="timeline-body">Complete system proposal including kinematic model, perception stack design, custom node architecture, module declaration table, safety protocols, and Git infrastructure.</div>
-          <div class="timeline-tags"><span class="tag">Differential Drive</span><span class="tag">SLAM Toolbox</span><span class="tag">Nav2</span><span class="tag">EKF</span><span class="tag">Jekyll Site</span></div>
+          <div class="timeline-body">Complete system proposal — kinematic model, perception stack design, custom node architecture, module declaration table, safety protocols, and Git infrastructure.</div>
+          <div class="timeline-tags"><span class="tag">Differential Drive</span><span class="tag">SLAM Toolbox</span><span class="tag">Nav2</span><span class="tag">EKF</span><span class="tag">Site Setup</span></div>
           <div class="timeline-meta">
             <div class="timeline-meta-item"><strong>Due:</strong> Mar 6</div>
             <div class="timeline-meta-item"><strong>Weight:</strong> 5%</div>
             <div class="timeline-meta-item"><strong>Status:</strong> Complete</div>
-            <a class="ms-link" href="milestones/milestone1.html">Read proposal →</a>
+            <div class="ms-links"><a class="ms-link" href="milestones/milestone1.html">Read proposal →</a></div>
           </div>
         </div>
       </div>
+
       <div class="timeline-item">
-        <div class="timeline-dot upcoming"></div>
+        <div class="timeline-dot submitted"></div>
         <div class="timeline-card">
           <div class="timeline-header">
             <div><div class="timeline-title">Milestone 2 — Mid-Point Technical Proof</div><div class="timeline-sub">Apr 15, 2026 · 10% weight · 2,500–3,000 words</div></div>
-            <span class="ms-badge upcoming">In Progress</span>
+            <span class="ms-badge submitted">⬆ Submitted</span>
           </div>
-          <div class="timeline-body">Concrete evidence of technical progress and system calibration — EKF tuning data, SLAM map from real hardware, working frontier and semantic classifier nodes.</div>
-          <div class="timeline-tags"><span class="tag">EKF Calibration</span><span class="tag">SLAM Map</span><span class="tag">Frontier Node</span><span class="tag">Semantic Classifier</span></div>
+          <div class="timeline-body">Three custom ROS2 nodes running on TurtleBot4 Lite — frontier explorer, 5-layer semantic hazard classifier with DeepHAZMAT YOLO, and behavior coordinator state machine. Includes rosbag evidence, RQT node graph, demo video, and full mathematical derivations.</div>
+          <div class="timeline-tags">
+            <span class="tag">Frontier Explorer</span><span class="tag">Semantic Classifier</span>
+            <span class="tag">Behavior Coordinator</span><span class="tag">DeepHAZMAT YOLO</span>
+            <span class="tag">ROS Bag</span><span class="tag">Math Derivations</span>
+          </div>
           <div class="timeline-meta">
             <div class="timeline-meta-item"><strong>Due:</strong> Apr 15</div>
             <div class="timeline-meta-item"><strong>Weight:</strong> 10%</div>
-            <div class="timeline-meta-item"><strong>Status:</strong> In Progress</div>
+            <div class="timeline-meta-item"><strong>Status:</strong> Submitted</div>
+            <div class="ms-links">
+              <a class="ms-link" href="milestones/milestone2.html">Full write-up →</a>
+              <a class="ms-link gold" href="math/m2-mathematics.html">Math page →</a>
+              <a class="ms-link blue" href="math/mathematics_merged.tex" target="_blank">.tex →</a>
+            </div>
           </div>
         </div>
       </div>
+
       <div class="timeline-item">
         <div class="timeline-dot future"></div>
         <div class="timeline-card">
@@ -350,8 +367,8 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
             <div><div class="timeline-title">Milestone 3 — Final Documentation & Analysis</div><div class="timeline-sub">May 6, 2026 · 15% weight · 3,000–3,500 words</div></div>
             <span class="ms-badge future">Upcoming</span>
           </div>
-          <div class="timeline-body">Scientific Dossier: mathematical derivations, performance benchmarking, semantic accuracy confusion matrix, and ethical evaluation.</div>
-          <div class="timeline-tags"><span class="tag">Math Derivations</span><span class="tag">Benchmarks</span><span class="tag">Confusion Matrix</span><span class="tag">Ethics</span><span class="tag">Demo Video</span></div>
+          <div class="timeline-body">Scientific Dossier — full hardware validation in disaster scenario, HAZMAT detection on robot camera, semantic accuracy confusion matrix, performance benchmarking, and ethical evaluation.</div>
+          <div class="timeline-tags"><span class="tag">Hardware Demo</span><span class="tag">HAZMAT on Robot</span><span class="tag">Confusion Matrix</span><span class="tag">Benchmarks</span><span class="tag">Ethics</span></div>
           <div class="timeline-meta">
             <div class="timeline-meta-item"><strong>Due:</strong> May 6</div>
             <div class="timeline-meta-item"><strong>Weight:</strong> 15%</div>
@@ -359,11 +376,11 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
           </div>
         </div>
       </div>
+
     </div>
   </div>
 </section>
 
-<!-- TEAM -->
 <section id="team">
   <div class="container">
     <div class="fade-in">
@@ -375,38 +392,43 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
       <div class="team-card">
         <div class="team-avatar av-a">PC</div>
         <div class="team-name">Princess Colon</div>
-        <div class="team-role">Perception & SLAM</div>
-        <div class="team-person">Person A · @PriColon</div>
+        <div class="team-role">Frontier Exploration Lead</div>
+        <div class="team-person">@PriColon</div>
         <ul class="team-tasks">
-          <li>slam_toolbox configuration</li><li>OAK-D camera driver setup</li>
-          <li>EKF localization tuning</li><li>Nav2 costmap configuration</li>
+          <li>frontier_explorer_node.py</li>
+          <li>SLAM on TurtleBot4 Lite hardware</li>
+          <li>ROS bag recording & demo video</li>
+          <li>RViz2 config & system diagram</li>
         </ul>
       </div>
       <div class="team-card">
         <div class="team-avatar av-b">RM</div>
         <div class="team-name">Rohit Mane</div>
-        <div class="team-role">Algorithm & Nodes</div>
-        <div class="team-person">Person B · @rmane2</div>
+        <div class="team-role">Mathematical Foundations</div>
+        <div class="team-person">@rmane2</div>
         <ul class="team-tasks">
-          <li>frontier_explorer_node.py</li><li>semantic_classifier_node.py</li>
-          <li>Information-gain scoring</li><li>Unit tests & parameter tuning</li>
+          <li>Kinematics & frontier scoring</li>
+          <li>EKF prediction & update equations</li>
+          <li>SLAM Bayes update derivation</li>
+          <li>DWA planner math</li>
         </ul>
       </div>
       <div class="team-card">
         <div class="team-avatar av-c">MK</div>
         <div class="team-name">Manjunath Kondamu</div>
-        <div class="team-role">Integration & Docs</div>
-        <div class="team-person">Person C · @Mkondamu</div>
+        <div class="team-role">Hazard Mapping & Integration</div>
+        <div class="team-person">@Mkondamu</div>
         <ul class="team-tasks">
-          <li>behavior_coordinator_node.py</li><li>explore.launch.py</li>
-          <li>Safety & E-stop logic</li><li>Documentation site</li>
+          <li>semantic_hazard_classifier_node.py</li>
+          <li>behavior_coordinator_node.py</li>
+          <li>DeepHAZMAT YOLO integration</li>
+          <li>exploration.launch.py & site</li>
         </ul>
       </div>
     </div>
   </div>
 </section>
 
-<!-- GITHUB STATS -->
 <section id="stats">
   <div class="container">
     <div class="fade-in">
@@ -437,7 +459,6 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
   </div>
 </section>
 
-<!-- GANTT / PROGRESS -->
 <section id="progress">
   <div class="container">
     <div class="fade-in">
@@ -461,7 +482,10 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
   <div class="footer-links">
     <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank">GitHub</a>
     <a href="milestones/milestone1.html">Milestone 1</a>
-    <a href="https://ras-mobile-robotics.github.io/project/m1.html" target="_blank">Course Site</a>
+    <a href="milestones/milestone2.html">Milestone 2</a>
+    <a href="math/m2-mathematics.html">Mathematics</a>
+    <a href="math/mathematics_merged.tex" target="_blank">LaTeX (.tex)</a>
+    <a href="https://ras-mobile-robotics.github.io/project/m2.html" target="_blank">Course Site</a>
   </div>
 </footer>
 
@@ -469,14 +493,14 @@ tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
 const obs=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting)x.target.classList.add('visible');});},{threshold:0.1});
 document.querySelectorAll('.fade-in').forEach(el=>obs.observe(el));
 const sections=document.querySelectorAll('section[id]');
-const navLinks=document.querySelectorAll('.nav-links a');
 window.addEventListener('scroll',()=>{
   let cur='';
   sections.forEach(s=>{if(window.scrollY>=s.offsetTop-80)cur=s.id;});
-  navLinks.forEach(a=>{a.style.color=a.getAttribute('href')==='#'+cur?'var(--gold)':'rgba(255,255,255,0.75)';});
+  document.querySelectorAll('.nav-links > li > a').forEach(a=>{
+    a.style.color=(a.getAttribute('href')==='#'+cur)?'var(--gold)':'rgba(255,255,255,0.75)';
+  });
 },{passive:true});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('lightbox').classList.remove('active');});
-
 const REPO='PriColon/mobile-robotics-frontier-exploration';
 const MEMBERS=[
   {name:'Princess Colon',login:'PriColon',color:'#8C1D40'},
@@ -508,14 +532,8 @@ async function loadStats(){
     (Array.isArray(prs)?prs:[]).forEach(p=>{if(p.user?.login){const l=p.user.login.toLowerCase();if(pc[l]!==undefined)pc[l]++;}});
     const maxC=Math.max(...Object.values(cc),1);
     const maxP=Math.max(...Object.values(pc),1);
-    document.getElementById('member-bars').innerHTML=MEMBERS.map(m=>{
-      const c=cc[m.login.toLowerCase()]||0;
-      return `<div class="member-bar-row"><div class="member-bar-label">${m.name}</div><div class="member-bar-track"><div class="member-bar-fill" style="width:${Math.round(c/maxC*100)}%;background:${m.color};"></div></div><div class="member-bar-count">${c}</div></div>`;
-    }).join('');
-    document.getElementById('pr-bars').innerHTML=MEMBERS.map(m=>{
-      const p=pc[m.login.toLowerCase()]||0;
-      return `<div class="member-bar-row"><div class="member-bar-label">${m.name}</div><div class="member-bar-track"><div class="member-bar-fill" style="width:${Math.round(p/maxP*100)}%;background:${m.color};"></div></div><div class="member-bar-count">${p}</div></div>`;
-    }).join('');
+    document.getElementById('member-bars').innerHTML=MEMBERS.map(m=>{const c=cc[m.login.toLowerCase()]||0;return `<div class="member-bar-row"><div class="member-bar-label">${m.name}</div><div class="member-bar-track"><div class="member-bar-fill" style="width:${Math.round(c/maxC*100)}%;background:${m.color};"></div></div><div class="member-bar-count">${c}</div></div>`;}).join('');
+    document.getElementById('pr-bars').innerHTML=MEMBERS.map(m=>{const p=pc[m.login.toLowerCase()]||0;return `<div class="member-bar-row"><div class="member-bar-label">${m.name}</div><div class="member-bar-track"><div class="member-bar-fill" style="width:${Math.round(p/maxP*100)}%;background:${m.color};"></div></div><div class="member-bar-count">${p}</div></div>`;}).join('');
     document.getElementById('commits-body').innerHTML=(Array.isArray(commits)?commits:[]).slice(0,30).map(c=>{
       const sha=c.sha.substring(0,7);
       const author=c.author?.login||c.commit?.author?.name||'—';
