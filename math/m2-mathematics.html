@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mathematical Foundations — M2 · RAS 598</title>
+
+  <!-- MathJax -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$'],['\\(','\\)']],
+        displayMath: [['$$','$$'],['\\[','\\]']],
+        tags: 'ams',
+        macros: {
+          q: '\\mathbf{q}',
+          bu: '\\mathbf{u}',
+          bF: '\\mathbf{F}',
+          bP: '\\mathbf{P}',
+          bK: '\\mathbf{K}',
+          bH: '\\mathbf{H}',
+          bQ: '\\mathbf{Q}',
+          bR: '\\mathbf{R}',
+          bI: '\\mathbf{I}',
+          cps: '\\cos\\psi',
+          sps: '\\sin\\psi',
+          cth: '\\cos\\theta',
+          sth: '\\sin\\theta',
+          cph: '\\cos\\phi',
+          sph: '\\sin\\phi',
+          tth: '\\tan\\theta',
+          tph: '\\tan\\phi',
+        }
+      },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+
+  <style>
+    :root {
+      --maroon: #8C1D40;
+      --gold:   #FFC627;
+      --dark:   #1a1a1a;
+      --text:   #2c2c2c;
+      --muted:  #666;
+      --bg:     #f9f9f9;
+      --card:   #ffffff;
+      --border: #e0e0e0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.8;
+    }
+    header {
+      background: var(--maroon);
+      color: white;
+      padding: 40px;
+    }
+    header h1 { font-size: 1.9rem; margin-bottom: 6px; }
+    header p  { opacity: 0.8; font-size: 0.95rem; }
+    .breadcrumb {
+      background: var(--dark);
+      padding: 10px 40px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.6);
+    }
+    .breadcrumb a { color: var(--gold); text-decoration: none; }
+
+    .page { max-width: 1060px; margin: 0 auto; padding: 40px; }
+    .two-col { display: grid; grid-template-columns: 220px 1fr; gap: 40px; align-items: start; }
+
+    /* TOC */
+    .toc {
+      position: sticky; top: 24px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .toc h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 12px; }
+    .toc a { display: block; padding: 5px 0 5px 10px; font-size: 13px; color: var(--text); text-decoration: none; border-left: 2px solid transparent; }
+    .toc a:hover { border-left-color: var(--maroon); color: var(--maroon); }
+    .toc a.sub { padding-left: 20px; font-size: 12px; color: var(--muted); }
+
+    /* Content */
+    .content section { margin-bottom: 60px; }
+    .content h2 {
+      font-size: 1.5rem;
+      color: var(--maroon);
+      border-bottom: 3px solid var(--gold);
+      padding-bottom: 8px;
+      margin-bottom: 18px;
+    }
+    .content h3 { font-size: 1.1rem; margin: 24px 0 10px; color: var(--dark); font-weight: 600; }
+    .content p  { margin-bottom: 14px; }
+
+    /* Math blocks */
+    .eq-block {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--maroon);
+      border-radius: 0 8px 8px 0;
+      padding: 18px 24px;
+      margin: 16px 0;
+      overflow-x: auto;
+    }
+    .eq-label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    /* Symbol tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin: 16px 0;
+    }
+    th {
+      background: var(--maroon);
+      color: white;
+      padding: 9px 14px;
+      text-align: left;
+      font-weight: 600;
+    }
+    td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+    tr:nth-child(even) td { background: #fafafa; }
+
+    /* Cards */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+    .card h4 { color: var(--maroon); margin-bottom: 8px; font-size: 0.95rem; }
+    .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+
+    /* Warning / note boxes */
+    .note {
+      background: #fff8e1;
+      border-left: 4px solid var(--gold);
+      padding: 12px 18px;
+      border-radius: 0 8px 8px 0;
+      font-size: 14px;
+      margin: 14px 0;
+    }
+    .note strong { color: var(--maroon); }
+    .fix {
+      background: #fce8ee;
+      border-left: 4px solid var(--maroon);
+      padding: 12px 18px;
+      border-radius: 0 8px 8px 0;
+      font-size: 14px;
+      margin: 14px 0;
+    }
+    .fix strong { color: var(--maroon); }
+
+    code { font-family: 'Consolas', monospace; font-size: 13px; background: #f0f0f0; padding: 2px 5px; border-radius: 3px; color: var(--maroon); }
+
+    footer {
+      background: var(--dark);
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      padding: 20px;
+      font-size: 13px;
+      margin-top: 60px;
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+
+    @media (max-width: 768px) {
+      .two-col { grid-template-columns: 1fr; }
+      .toc { display: none; }
+      .card-grid { grid-template-columns: 1fr; }
+      .page { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="breadcrumb">
+  <a href="../index.html">Home</a> › <a href="milestone2.html">Milestone 2</a> › Mathematical Foundations
+</div>
+
+<header>
+  <h1>Mathematical Foundations</h1>
+  <p>RAS 598: Mobile Robotics · Spring 2026 · Derivations by Rohit Mane (rmane2)</p>
+</header>
+
+<div class="page">
+  <div class="two-col">
+
+    <aside>
+      <nav class="toc">
+        <h3>Sections</h3>
+        <a href="#kinematics-2d">1. 2D Differential Drive</a>
+        <a class="sub" href="#state-vector">State vector</a>
+        <a class="sub" href="#wheel-vel">Wheel → velocity</a>
+        <a class="sub" href="#ode">Motion ODE</a>
+        <a class="sub" href="#euler">Euler integration</a>
+        <a class="sub" href="#arc">Arc integration</a>
+        <a href="#frontier">2. Frontier Scoring</a>
+        <a class="sub" href="#formula">Formula</a>
+        <a class="sub" href="#params">Parameter choices</a>
+        <a class="sub" href="#failures">Failure modes</a>
+        <a href="#slam">3. SLAM — Occupancy Grid</a>
+        <a class="sub" href="#bayes">Bayes update</a>
+        <a class="sub" href="#log-odds">Log-odds</a>
+        <a href="#ekf">4. EKF State Estimation</a>
+        <a class="sub" href="#prediction">Prediction step</a>
+        <a class="sub" href="#update">Update step</a>
+        <a href="#semantic">5. Semantic Classifier</a>
+        <a class="sub" href="#hsv">HSV thresholds</a>
+        <a class="sub" href="#edge">Edge density</a>
+        <a class="sub" href="#hazmat-math">HAZMAT — NMS</a>
+        <a href="#nav2">6. Nav2 DWA Planner</a>
+        <a class="sub" href="#constraints">Velocity constraints</a>
+        <a class="sub" href="#objective">Objective function</a>
+        <a href="#kinematics-3d">7. 3D Kinematics</a>
+      </nav>
+    </aside>
+
+    <main class="content">
+
+      <!-- ══ SECTION 1 ══ -->
+      <section id="kinematics-2d">
+        <h2>1. 2D Differential Drive Kinematics</h2>
+        <p>
+          The TurtleBot4 Lite uses a differential drive base (iRobot Create3).
+          The robot's pose in the plane is fully described by three quantities,
+          and motion is commanded by the independent angular velocities of the
+          left and right wheels.
+        </p>
+
+        <h3 id="state-vector">1.1 State Vector and Control Inputs</h3>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 1 — State and control</div>
+          $$\mathbf{q}(t) = \begin{bmatrix} x(t) \\ y(t) \\ \psi(t) \end{bmatrix}, \qquad \mathbf{u}(t) = \begin{bmatrix} \omega_L(t) \\ \omega_R(t) \end{bmatrix}$$
+        </div>
+
+        <table>
+          <thead><tr><th>Symbol</th><th>Meaning</th><th>Units</th></tr></thead>
+          <tbody>
+            <tr><td>$x,\,y$</td><td>Position of robot centre in world frame</td><td>m</td></tr>
+            <tr><td>$\psi$</td><td>Heading angle from positive $x$-axis</td><td>rad</td></tr>
+            <tr><td>$\omega_L,\,\omega_R$</td><td>Left/right wheel angular velocities</td><td>rad s⁻¹</td></tr>
+          </tbody>
+        </table>
+
+        <h3 id="wheel-vel">1.2 Wheel Velocities → Linear and Angular Velocity</h3>
+        <p>Each wheel of radius $r$ contributes a tangential speed. The net forward speed $v$ and yaw rate $\dot\psi$ are their symmetric and antisymmetric combinations, normalised by wheelbase $L$:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 2 — Forward speed</div>
+          $$v(t) = \frac{r}{2}\bigl(\omega_R(t) + \omega_L(t)\bigr)$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 3 — Yaw rate</div>
+          $$\dot{\psi}(t) = \frac{r}{L}\bigl(\omega_R(t) - \omega_L(t)\bigr)$$
+        </div>
+
+        <table>
+          <thead><tr><th>Symbol</th><th>Meaning</th><th>TurtleBot4 Lite value</th></tr></thead>
+          <tbody>
+            <tr><td>$r$</td><td>Wheel radius</td><td>0.0352 m</td></tr>
+            <tr><td>$L$</td><td>Track width (wheel-to-wheel)</td><td>0.233 m</td></tr>
+            <tr><td>$v$</td><td>Forward linear speed</td><td>max 0.31 m/s</td></tr>
+            <tr><td>$\dot\psi$</td><td>Yaw rate</td><td>max 1.90 rad/s</td></tr>
+          </tbody>
+        </table>
+
+        <h3 id="ode">1.3 Continuous-Time Motion Model</h3>
+        <p>Projecting the forward speed onto the world frame gives the full nonlinear kinematic model:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 4 — Kinematic ODE</div>
+          $$\dot{\mathbf{q}}(t) = \begin{bmatrix} \dot{x}(t) \\ \dot{y}(t) \\ \dot{\psi}(t) \end{bmatrix} = \begin{bmatrix} v(t)\cos\psi(t) \\ v(t)\sin\psi(t) \\ \dot{\psi}(t) \end{bmatrix} = f\bigl(\mathbf{q}(t),\,\mathbf{u}(t)\bigr)$$
+        </div>
+
+        <h3 id="euler">1.4 Discrete-Time State Update (Euler Integration)</h3>
+        <p>For a fixed timestep $\Delta t$ using forward Euler:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 5 — Euler step</div>
+          $$\mathbf{q}_{k+1} = \mathbf{q}_k + \Delta t \cdot f(\mathbf{q}_k,\,\mathbf{u}_k)$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 6 — Expanded components</div>
+          $$\begin{aligned} x_{k+1} &= x_k + v_k \cos\psi_k \cdot \Delta t \\ y_{k+1} &= y_k + v_k \sin\psi_k \cdot \Delta t \\ \psi_{k+1} &= \psi_k + \dot{\psi}_k \cdot \Delta t \end{aligned}$$
+        </div>
+
+        <h3 id="arc">1.5 Exact Arc-Based Integration</h3>
+        <p>When $\dot\psi_k \neq 0$, integrating exactly over the arc eliminates Euler accumulation error. Let $\kappa = \dot\psi_k\,\Delta t$:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 7 — Arc integration</div>
+          $$\begin{aligned} x_{k+1} &= x_k + \frac{v_k}{\dot{\psi}_k}\Bigl(\sin(\psi_k+\kappa) - \sin\psi_k\Bigr) \\ y_{k+1} &= y_k - \frac{v_k}{\dot{\psi}_k}\Bigl(\cos(\psi_k+\kappa) - \cos\psi_k\Bigr) \\ \psi_{k+1} &= \psi_k + \kappa \end{aligned}$$
+        </div>
+        <div class="note">
+          <strong>Note:</strong> When $\dot\psi_k \approx 0$ (straight-line motion), Eq. 6 is numerically preferred. Eq. 7 degenerates gracefully via L'Hôpital's rule to the same result.
+        </div>
+
+        <div class="eq-block">
+          <div class="eq-label">Eq. 8 — Full mapping: wheel velocities → state update</div>
+          $$\begin{bmatrix} x_{k+1} \\ y_{k+1} \\ \psi_{k+1} \end{bmatrix} = \begin{bmatrix} x_k \\ y_k \\ \psi_k \end{bmatrix} + \frac{r\,\Delta t}{2} \begin{bmatrix} (\omega_{R,k}+\omega_{L,k})\cos\psi_k \\ (\omega_{R,k}+\omega_{L,k})\sin\psi_k \\ \dfrac{2}{L}(\omega_{R,k}-\omega_{L,k}) \end{bmatrix}$$
+        </div>
+      </section>
+
+      <!-- ══ SECTION 2 ══ -->
+      <section id="frontier">
+        <h2>2. Frontier Scoring Formula</h2>
+        <p>
+          Among all candidate frontier regions $R$ on the boundary between known-free and unknown space,
+          the robot selects the one with the highest score. This balances three competing objectives:
+          reward large frontiers, reward high information gain, and penalise distant targets.
+        </p>
+
+        <h3 id="formula">2.1 The Formula</h3>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 9 — Frontier score</div>
+          $$\text{score}(R) = \frac{\alpha \cdot \text{size}(R) \;+\; \beta \cdot \text{unknown}(R)}{\text{dist}(R) + \varepsilon}$$
+        </div>
+
+        <table>
+          <thead><tr><th>Symbol</th><th>Meaning</th><th>Value in code</th></tr></thead>
+          <tbody>
+            <tr><td>$\text{size}(R)$</td><td>Number of frontier cells in region $R$</td><td>cluster size</td></tr>
+            <tr><td>$\text{unknown}(R)$</td><td>Unknown cells within $r=0.5$ m of centroid</td><td>count at radius</td></tr>
+            <tr><td>$\text{dist}(R)$</td><td>Euclidean distance from robot to centroid</td><td>metres</td></tr>
+            <tr><td>$\alpha$</td><td>Size weight</td><td><code>1.0</code></td></tr>
+            <tr><td>$\beta$</td><td>Information gain weight</td><td><code>2.0</code></td></tr>
+            <tr><td>$\varepsilon$</td><td>Division-by-zero guard</td><td><code>1e-6</code></td></tr>
+          </tbody>
+        </table>
+
+        <div class="fix">
+          <strong>Correction from draft:</strong> The original Part 1 draft suggested α ∈ [0.3, 1.0] and β ∈ [1.0, 3.0].
+          Part 2 inconsistently used α ∈ [0.3, 0.5], β ∈ [0.5, 0.7]. The values actually implemented are
+          <strong>α = 1.0, β = 2.0, ε = 1×10⁻⁶</strong>, chosen to weight information gain twice as heavily as frontier size.
+        </div>
+
+        <h3 id="params">2.2 Parameter Choices and Rationale</h3>
+        <div class="card-grid">
+          <div class="card">
+            <h4>α — size weight (1.0)</h4>
+            <p style="font-size:14px">Favours large open frontiers. Prevents the robot from wasting navigation budget on tiny isolated pockets. Typical range [0.3, 1.0].</p>
+          </div>
+          <div class="card">
+            <h4>β — information gain weight (2.0)</h4>
+            <p style="font-size:14px">Directly rewards unexplored area. Set to 2× size weight to drive aggressive coverage. Higher β produces faster but noisier exploration. Range [1.0, 3.0].</p>
+          </div>
+          <div class="card">
+            <h4>ε — stability guard (1e-6)</h4>
+            <p style="font-size:14px">Must satisfy $\varepsilon \ll \min_R \text{dist}(R)$. At 1×10⁻⁶ m it stabilises the denominator without biasing scores for any realistic robot position.</p>
+          </div>
+          <div class="card">
+            <h4>α/β ratio</h4>
+            <p style="font-size:14px">Only the ratio matters — scaling both by a constant leaves the ranking unchanged. Our ratio α/β = 0.5 means the robot prioritises <em>information density</em> over raw frontier area.</p>
+          </div>
+        </div>
+
+        <h3 id="failures">2.3 Failure Modes and Mitigations</h3>
+        <table>
+          <thead><tr><th>Failure Mode</th><th>Cause</th><th>Mitigation</th></tr></thead>
+          <tbody>
+            <tr><td>Greedy cycling</td><td>Two frontiers with equal scores cause oscillation</td><td>Hysteresis bonus for currently-targeted frontier</td></tr>
+            <tr><td>Distance dominance</td><td>Late in mapping all frontiers are far — denominator overwhelms numerator</td><td>Normalise dist by map diagonal or use log penalty</td></tr>
+            <tr><td>Wrong α/β for environment</td><td>Open warehouses vs tight corridors need different tuning</td><td>Tune offline on representative map; adapt to local occupancy variance</td></tr>
+            <tr><td>ε too large</td><td>Distance penalty vanishes for near frontiers</td><td>Keep ε ≪ minimum expected distance</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ══ SECTION 3 ══ -->
+      <section id="slam">
+        <h2>3. SLAM — Occupancy Grid via Bayes Rule</h2>
+        <p>
+          SLAM Toolbox maintains a probabilistic occupancy grid where each cell $m_i$ stores the
+          log-odds of being occupied given all sensor observations $z_{1:t}$.
+        </p>
+
+        <h3 id="log-odds">3.1 Log-Odds Representation</h3>
+        <p>The log-odds of a probability $p$ is defined as:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 10 — Log-odds</div>
+          $$l(p) = \log\left(\frac{p}{1-p}\right)$$
+        </div>
+        <p>This maps probabilities $[0,1]$ to $(-\infty, +\infty)$, making Bayesian updates an additive operation that is numerically stable and computationally cheap.</p>
+
+        <h3 id="bayes">3.2 Recursive Bayesian Update</h3>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 11 — Log-odds update rule</div>
+          $$l(m_i \mid z_{1:t}) = l(m_i \mid z_{1:t-1}) + l(m_i \mid z_t) - l_0$$
+        </div>
+
+        <table>
+          <thead><tr><th>Term</th><th>Meaning</th><th>Value (SLAM Toolbox default)</th></tr></thead>
+          <tbody>
+            <tr><td>$l(m_i \mid z_{1:t})$</td><td>Posterior log-odds after observation $z_t$</td><td>—</td></tr>
+            <tr><td>$l(m_i \mid z_t)$</td><td>Sensor model: log-odds from single scan hit/miss</td><td>hit: +0.85 · miss: −0.4</td></tr>
+            <tr><td>$l_0$</td><td>Prior log-odds (uniform prior = 50% occupied)</td><td>0</td></tr>
+          </tbody>
+        </table>
+
+        <p>To recover probability from log-odds: $p = 1 - \dfrac{1}{1 + e^l}$. The OccupancyGrid message encodes these probabilities as integers 0–100 (0 = free, 100 = occupied, −1 = unknown).</p>
+      </section>
+
+      <!-- ══ SECTION 4 ══ -->
+      <section id="ekf">
+        <h2>4. Extended Kalman Filter — State Estimation</h2>
+        <p>
+          The <code>robot_localization</code> EKF node fuses wheel odometry (<code>/odom</code>) and
+          IMU data to produce <code>/odometry/filtered</code>. The EKF linearises the nonlinear
+          motion model at each step to propagate the Gaussian uncertainty estimate.
+        </p>
+
+        <h3 id="prediction">4.1 Prediction Step</h3>
+        <p>Using the kinematic model from Section 1, the predicted state and covariance are:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 12 — State prediction</div>
+          $$\hat{\mathbf{q}}_{k+1|k} = \mathbf{q}_k + \Delta t \begin{bmatrix} v\cos\theta_k \\ v\sin\theta_k \\ \frac{r}{L}(\omega_R - \omega_L) \end{bmatrix}$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 13 — Covariance prediction</div>
+          $$\mathbf{P}_{k+1|k} = \mathbf{F}_k \mathbf{P}_k \mathbf{F}_k^\top + \mathbf{Q}_k$$
+        </div>
+        <p>where the Jacobian of the motion model $\mathbf{F}_k$ (first-order Taylor linearisation) is:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 14 — Motion Jacobian</div>
+          $$\mathbf{F}_k = \mathbf{I} + \Delta t \begin{bmatrix} 0 & 0 & -v\sin\theta_k \\ 0 & 0 & v\cos\theta_k \\ 0 & 0 & 0 \end{bmatrix}$$
+        </div>
+
+        <table>
+          <thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>$\mathbf{P}_k$</td><td>3×3 state covariance matrix at step $k$</td></tr>
+            <tr><td>$\mathbf{Q}_k$</td><td>Process noise covariance (wheel slip, unmodelled dynamics)</td></tr>
+            <tr><td>$\mathbf{F}_k$</td><td>Jacobian of $f$ with respect to state $\mathbf{q}$</td></tr>
+          </tbody>
+        </table>
+
+        <h3 id="update">4.2 Update Step</h3>
+        <p>When a sensor measurement $z_k$ arrives (e.g. IMU yaw rate, wheel encoder), the Kalman gain and corrected state are:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 15 — Kalman gain</div>
+          $$\mathbf{K}_k = \mathbf{P}_{k|k-1}\mathbf{H}_k^\top \left(\mathbf{H}_k \mathbf{P}_{k|k-1} \mathbf{H}_k^\top + \mathbf{R}_k \right)^{-1}$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 16 — State update</div>
+          $$\hat{\mathbf{q}}_{k|k} = \hat{\mathbf{q}}_{k|k-1} + \mathbf{K}_k \left(z_k - h(\hat{\mathbf{q}}_{k|k-1})\right)$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 17 — Covariance update</div>
+          $$\mathbf{P}_{k|k} = (\mathbf{I} - \mathbf{K}_k \mathbf{H}_k)\mathbf{P}_{k|k-1}$$
+        </div>
+
+        <table>
+          <thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>$\mathbf{H}_k$</td><td>Jacobian of measurement model $h$ w.r.t. state</td></tr>
+            <tr><td>$\mathbf{R}_k$</td><td>Measurement noise covariance</td></tr>
+            <tr><td>$\mathbf{K}_k$</td><td>Kalman gain — weights prediction vs measurement trust</td></tr>
+            <tr><td>$z_k - h(\hat{\mathbf{q}})$</td><td>Innovation: difference between actual and predicted measurement</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>Connection to our system:</strong> The EKF output <code>/odometry/filtered</code>
+          is consumed by both the frontier explorer node (robot position for scoring) and the
+          behavior coordinator node (proximity checks for visited frontier filtering).
+        </div>
+      </section>
+
+      <!-- ══ SECTION 5 ══ -->
+      <section id="semantic">
+        <h2>5. Semantic Hazard Classifier</h2>
+        <p>
+          The classifier operates on HSV colour space patches extracted from the OAK-D RGB stream.
+          For each $3 \times 4$ patch grid, three conditions are evaluated: hue range, saturation,
+          and edge density.
+        </p>
+
+        <h3 id="hsv">5.1 HSV Threshold Rules</h3>
+
+        <table>
+          <thead>
+            <tr><th>Class</th><th>Hue $H$ range</th><th>Saturation $S$</th><th>Value $V$</th><th>Edge density $\rho$</th><th>Patch threshold</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>FIRE</td><td>$H \lt 20°$ or $H \gt 160°$</td><td>$S \gt 120$</td><td>$V \gt 120$</td><td>—</td><td>$> 12\%$ of patch</td></tr>
+            <tr><td>WATER</td><td>$90° \lt H \lt 130°$</td><td>$S \gt 20$</td><td>$V \gt 80$</td><td>—</td><td>$> 18\%$ of patch</td></tr>
+            <tr><td>SMOKE</td><td>any</td><td>$S \lt 30$</td><td>$60 \lt V \lt 170$</td><td>—</td><td>$> 55\%$ of patch</td></tr>
+            <tr><td>HAZMAT cue</td><td>$18° \lt H \lt 36°$</td><td>$S \gt 100$</td><td>$V \gt 100$</td><td>—</td><td>$> 15\%$ of patch</td></tr>
+            <tr><td>DEBRIS</td><td>any</td><td>any</td><td>any</td><td>$\rho \gt 0.22$</td><td>high edge density</td></tr>
+            <tr><td>DARK</td><td>any</td><td>any</td><td>$\bar{V} \lt 45$</td><td>—</td><td>mean brightness</td></tr>
+          </tbody>
+        </table>
+
+        <h3 id="edge">5.2 Edge Density Formula</h3>
+        <p>For a patch region-of-interest (ROI), the edge density $\rho$ is computed using the Canny edge detector with thresholds $\tau_1 = 50$, $\tau_2 = 150$:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 18 — Edge density</div>
+          $$\rho_{\text{edge}} = \frac{\left|\left\{p \in \text{ROI} : |\nabla I(p)| > \tau\right\}\right|}{|\text{ROI}|}$$
+        </div>
+        <p>where $|\nabla I(p)|$ is the gradient magnitude at pixel $p$ computed by the Canny operator. Debris, cables, and structural collapse produce $\rho > 0.22$; smooth clean floors produce $\rho < 0.10$.</p>
+
+        <h3 id="hazmat-math">5.3 HAZMAT Detection — YOLOv3-tiny and Non-Maximum Suppression</h3>
+        <p>
+          DeepHAZMAT uses a YOLOv3-tiny backbone that outputs bounding box predictions
+          $(t_x, t_y, t_w, t_h, p_o)$ per grid cell per anchor. The predicted box centre is:
+        </p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 19 — YOLO bounding box decoding</div>
+          $$b_x = \sigma(t_x) + c_x, \quad b_y = \sigma(t_y) + c_y, \quad b_w = p_w e^{t_w}, \quad b_h = p_h e^{t_h}$$
+        </div>
+        <p>where $(c_x, c_y)$ is the grid cell offset, $(p_w, p_h)$ are the prior anchor dimensions, and $\sigma$ is the sigmoid function. After decoding, Adaptive Non-Maximum Suppression (A-NMS) removes redundant overlapping boxes:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 20 — IoU for NMS</div>
+          $$\text{IoU}(A,B) = \frac{|A \cap B|}{|A \cup B|}$$
+        </div>
+        <p>Boxes with $\text{IoU} > \tau_{\text{NMS}} = 0.3$ and lower confidence are suppressed. Our minimum confidence threshold is set to $p_o > 0.5$ to reduce false positives in cluttered disaster-zone environments.</p>
+
+        <h3>5.4 Semantic Map Encoding</h3>
+        <p>The hazard label is encoded as an integer cell value in the OccupancyGrid message:</p>
+        <table>
+          <thead><tr><th>Value</th><th>Hazard class</th><th>Behaviour</th></tr></thead>
+          <tbody>
+            <tr><td>0</td><td>CLEAR</td><td>Navigate freely</td></tr>
+            <tr><td>30</td><td>DEBRIS</td><td>Navigate cautiously</td></tr>
+            <tr><td>50</td><td>SMOKE</td><td>Flag for logging</td></tr>
+            <tr><td>70–75</td><td>WATER / DARK</td><td>Skip as frontier target</td></tr>
+            <tr><td>80</td><td>NARROW / DEAD_END</td><td>Skip as frontier target</td></tr>
+            <tr><td>85–95</td><td>GLASS / HAZMAT / POTHOLE</td><td>Skip + E-stop</td></tr>
+            <tr><td>100</td><td>FIRE / CLIFF</td><td>Immediate E-stop</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ══ SECTION 6 ══ -->
+      <section id="nav2">
+        <h2>6. Nav2 DWA Local Planner</h2>
+        <p>
+          The Dynamic Window Approach (DWA) samples feasible velocity commands and selects
+          the one that best balances goal heading, obstacle clearance, and forward speed.
+        </p>
+
+        <h3 id="constraints">6.1 Velocity Constraints</h3>
+        <p>The dynamic window restricts commands to velocities reachable within one control cycle $\Delta t$ given current acceleration limits:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 21 — Dynamic window</div>
+          $$v \in \bigl[v_c - a_v \Delta t,\; v_c + a_v \Delta t\bigr], \qquad \omega \in \bigl[\omega_c - a_\omega \Delta t,\; \omega_c + a_\omega \Delta t\bigr]$$
+        </div>
+        <p>These are further clipped to the robot's absolute limits $v \in [v_{\min}, v_{\max}]$, $\omega \in [-\omega_{\max}, \omega_{\max}]$.</p>
+        <p>A safety constraint prevents commanding velocities that cannot brake before hitting an obstacle at distance $d_{\text{obstacle}}$:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 22 — Braking constraint</div>
+          $$v \leq \sqrt{2 \cdot d_{\text{obstacle}} \cdot a_{v,\text{brake}}}$$
+        </div>
+
+        <h3 id="objective">6.2 Objective Function</h3>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 23 — DWA cost</div>
+          $$G(v,\omega) = \sigma\!\left(\alpha \cdot \text{heading}(v,\omega) + \beta \cdot \text{clearance}(v,\omega) + \gamma \cdot \text{velocity}(v,\omega)\right)$$
+        </div>
+        <p>where $\sigma$ is a normalisation factor. The three sub-costs are: <em>heading</em> — alignment with the goal direction; <em>clearance</em> — distance to nearest obstacle; <em>velocity</em> — forward speed reward. Nav2's DWB (Dynamic Window Based) controller extends this with configurable critic plugins.</p>
+
+        <p>The arc-based trajectory prediction used during velocity sampling follows the same exact integration as Eq. 7:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 24 — Arc trajectory prediction</div>
+          $$\begin{bmatrix} x_{k+1} \\ y_{k+1} \\ \theta_{k+1} \end{bmatrix} = \begin{bmatrix} x_k + R\bigl(\sin(\theta_k + \Delta\theta) - \sin\theta_k\bigr) \\ y_k - R\bigl(\cos(\theta_k + \Delta\theta) - \cos\theta_k\bigr) \\ \theta_k + \Delta\theta \end{bmatrix}, \qquad R = \frac{b}{2} \cdot \frac{\omega_R + \omega_L}{\omega_R - \omega_L}$$
+        </div>
+      </section>
+
+      <!-- ══ SECTION 7 ══ -->
+      <section id="kinematics-3d">
+        <h2>7. 3D Differential Drive Kinematics (Uneven Terrain)</h2>
+        <p>
+          For completeness — and for future M3 hardware testing on uneven surfaces —
+          the 2D model extends to 6-DOF using ZYX Euler angles. Control inputs remain
+          the two wheel velocities; $z$, roll, and pitch are constrained by the terrain.
+        </p>
+
+        <div class="eq-block">
+          <div class="eq-label">Eq. 25 — 3D state vector</div>
+          $$\mathbf{q}(t) = \begin{bmatrix} x(t)\\y(t)\\z(t)\\\phi(t)\\\theta(t)\\\psi(t) \end{bmatrix}, \qquad \mathbf{u}(t) = \begin{bmatrix}\omega_L(t)\\\omega_R(t)\end{bmatrix}$$
+        </div>
+
+        <p>The rotation matrix $R(\phi,\theta,\psi)$ using ZYX convention ($R_z(\psi)\,R_y(\theta)\,R_x(\phi)$):</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 26 — Rotation matrix</div>
+          $$R = \begin{bmatrix} \cos\psi\cos\theta & \cos\psi\sin\theta\sin\phi - \sin\psi\cos\phi & \cos\psi\sin\theta\cos\phi + \sin\psi\sin\phi \\ \sin\psi\cos\theta & \sin\psi\sin\theta\sin\phi + \cos\psi\cos\phi & \sin\psi\sin\theta\cos\phi - \cos\psi\sin\phi \\ -\sin\theta & \cos\theta\sin\phi & \cos\theta\cos\phi \end{bmatrix}$$
+        </div>
+
+        <p>World-frame velocity (robot moves along body $x$-axis at speed $v$):</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 27 — 3D translational velocity</div>
+          $$\begin{bmatrix}\dot x \\ \dot y \\ \dot z\end{bmatrix} = v(t) \begin{bmatrix}\cos\psi\cos\theta \\ \sin\psi\cos\theta \\ -\sin\theta\end{bmatrix}$$
+        </div>
+
+        <p>The complete discrete-time update — only $x$, $y$, $\psi$ are numerically integrated; $z$, $\phi$, $\theta$ are read from terrain model $h(x,y)$:</p>
+        <div class="eq-block">
+          <div class="eq-label">Eq. 28 — 3D state update (boxed)</div>
+          $$\boxed{\begin{aligned} x_{k+1} &= x_k + v_k\cos\psi_k\cos\theta_k\,\Delta t \\ y_{k+1} &= y_k + v_k\sin\psi_k\cos\theta_k\,\Delta t \\ z_{k+1} &= h(x_{k+1},\,y_{k+1}) \\ \phi_{k+1} &= \phi_{\text{surface}}(x_{k+1},\,y_{k+1},\,\psi_{k+1}) \\ \theta_{k+1} &= \theta_{\text{surface}}(x_{k+1},\,y_{k+1},\,\psi_{k+1}) \\ \psi_{k+1} &= \psi_k + \dot\psi_k\,\Delta t \end{aligned}}$$
+        </div>
+
+        <div class="note">
+          <strong>Singularity warning:</strong> The Euler angle parameterisation is undefined at $\theta = \pm 90°$ (gimbal lock). For steep terrain, replace Euler angles with unit quaternion $\mathbf{q} = (q_0, q_1, q_2, q_3)^\top$ and use $\dot{\mathbf{q}} = \tfrac{1}{2}\,\Xi(\mathbf{q})\,\boldsymbol\omega_b$.
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<footer>
+  <p>RAS 598: Mobile Robotics · Spring 2026 · Arizona State University ·
+    Mathematical derivations by Rohit Mane ·
+    <a href="milestone2.html">Back to Milestone 2</a> ·
+    <a href="../index.html">Home</a>
+  </p>
+</footer>
+
+</body>
+</html>
