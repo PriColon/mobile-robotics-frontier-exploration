@@ -1,0 +1,173 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath, amssymb}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+
+\geometry{margin=1in}
+
+\title{Robotics Exploration, SLAM, EKF, and Navigation Formulations}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Frontier Scoring Formula}
+
+\begin{equation}
+\text{score}(R) = \frac{\alpha \cdot \text{size} + \beta \cdot \text{unknown}}{\text{dist} + \varepsilon}
+\end{equation}
+
+\begin{itemize}
+    \item \textbf{size}: number of frontier cells in region $R$
+    \item \textbf{unknown}: number of unknown cells adjacent to the frontier
+    \item \textbf{dist}: Euclidean/path distance from robot to frontier centroid
+    \item $\varepsilon$: small constant to prevent division-by-zero
+\end{itemize}
+
+\textbf{Parameter Selection:}
+\begin{itemize}
+    \item $\alpha \in [0.3, 0.5]$
+    \item $\beta \in [0.5, 0.7]$
+    \item $\varepsilon \approx 0.01$
+\end{itemize}
+
+\begin{equation}
+\mathbf{q}(t) = [x,\; y,\; \theta]^\top
+\end{equation}
+
+\section{SLAM: Occupancy Grid via Bayes Rule}
+
+\begin{equation}
+l(m_i \mid z_{1:t}) = l(m_i \mid z_{1:t-1}) + l(m_i \mid z_t) - l_0
+\end{equation}
+
+\begin{equation}
+l(p) = \log\left(\frac{p}{1-p}\right)
+\end{equation}
+
+\begin{itemize}
+    \item $l_{\text{occ}} \approx +0.85$
+    \item $l_{\text{free}} \approx -0.4$
+    \item $l_0 = 0$
+\end{itemize}
+
+\section{EKF: Prediction and Update}
+
+\subsection{Prediction Step}
+
+\begin{equation}
+\hat{\mathbf{q}}_{k+1|k} =
+\mathbf{q}_k + \Delta t
+\begin{bmatrix}
+v\cos\theta_k \\
+v\sin\theta_k \\
+\frac{r}{b}(\omega_R - \omega_L)
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+\mathbf{P}_{k+1|k} =
+\mathbf{F}_k \mathbf{P}_k \mathbf{F}_k^\top + \mathbf{Q}_k
+\end{equation}
+
+\begin{equation}
+\mathbf{F}_k = \mathbf{I} + \Delta t
+\begin{bmatrix}
+0 & 0 & -v\sin\theta_k \\
+0 & 0 & v\cos\theta_k \\
+0 & 0 & 0
+\end{bmatrix}
+\end{equation}
+
+\subsection{Update Step}
+
+\begin{equation}
+\mathbf{K}_k =
+\mathbf{P}_{k|k-1}\mathbf{H}_k^\top
+\left(\mathbf{H}_k \mathbf{P}_{k|k-1} \mathbf{H}_k^\top + \mathbf{R}_k \right)^{-1}
+\end{equation}
+
+\begin{equation}
+\hat{\mathbf{q}}_{k|k} =
+\hat{\mathbf{q}}_{k|k-1} +
+\mathbf{K}_k \left(z_k - h(\hat{\mathbf{q}}_{k|k-1})\right)
+\end{equation}
+
+\begin{equation}
+\mathbf{P}_{k|k} =
+(\mathbf{I} - \mathbf{K}_k \mathbf{H}_k)\mathbf{P}_{k|k-1}
+\end{equation}
+
+\section{Semantic Classifier}
+
+\begin{center}
+\begin{tabular}{ccccc}
+\toprule
+Class & H Range & S Range & V Range & Edge Density \\
+\midrule
+FIRE   & $0^\circ$--$25^\circ$   & $>150$ & $>100$ & $<0.15$ \\
+WATER  & $90^\circ$--$130^\circ$ & $>80$  & $>60$  & $<0.25$ \\
+DEBRIS & any & $<60$ & any & $>0.35$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{equation}
+\rho_{\text{edge}} =
+\frac{\left|\{p \in \text{ROI} : |\nabla I(p)| > \tau\}\right|}{|\text{ROI}|}
+\end{equation}
+
+\section{Nav2 DWA Planner}
+
+\begin{equation}
+v \in [v_{\min}, v_{\max}]
+\end{equation}
+
+\begin{equation}
+\omega \in [-\omega_{\max}, \omega_{\max}]
+\end{equation}
+
+\begin{equation}
+v \in [v_c - a_v \Delta t,\; v_c + a_v \Delta t]
+\end{equation}
+
+\begin{equation}
+\omega \in [\omega_c - a_\omega \Delta t,\; \omega_c + a_\omega \Delta t]
+\end{equation}
+
+\begin{equation}
+v \leq \sqrt{2 \cdot d_{\text{obstacle}} \cdot a_{v,\text{brake}}}
+\end{equation}
+
+\begin{equation}
+G(v,\omega) =
+\sigma\left(
+\alpha \cdot \text{heading}(v,\omega)
++ \beta \cdot \text{clearance}(v,\omega)
++ \gamma \cdot \text{velocity}(v,\omega)
+\right)
+\end{equation}
+
+\begin{equation}
+\begin{bmatrix}
+x_{k+1} \\
+y_{k+1} \\
+\theta_{k+1}
+\end{bmatrix}
+=
+\begin{bmatrix}
+x_k + R\left(\sin(\theta_k + \Delta\theta) - \sin\theta_k\right) \\
+y_k - R\left(\cos(\theta_k + \Delta\theta) - \cos\theta_k\right) \\
+\theta_k + \Delta\theta
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+R = \frac{b}{2} \cdot \frac{\omega_R + \omega_L}{\omega_R - \omega_L}
+\end{equation}
+
+\end{document}
