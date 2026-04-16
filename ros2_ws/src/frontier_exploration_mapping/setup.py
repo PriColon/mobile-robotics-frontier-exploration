@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'frontier_exploration_mapping'
 
@@ -10,21 +12,20 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['launch/exploration.launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='Group 1',
     maintainer_email='picolon@asu.edu',
-    description='',
+    description='Autonomous Frontier Exploration with Semantic Hazard Mapping',
     license='Apache-2.0',
-    extras_require={
-        'test': [
-            'pytest',
-        ],
-    },
+    extras_require={'test': ['pytest']},
     entry_points={
         'console_scripts': [
-            'frontier_explorer_node = frontier_exploration_mapping.frontier_explorer_node:main'
+            'frontier_explorer_node = frontier_exploration_mapping.frontier_explorer_node:main',
+            'semantic_hazard_classifier_node = frontier_exploration_mapping.semantic_hazard_classifier_node:main',
+            'behavior_coordinator_node = frontier_exploration_mapping.behavior_coordinator_node:main',
         ],
     },
 )
