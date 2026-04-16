@@ -257,11 +257,11 @@ class FrontierExplorer(Node):
         self.declare_parameter('alpha', 1.0)                # Scoring: Weight of consideration for cluster size
         self.declare_parameter('beta', 2.0)                 # Scoring: Weight of consideration for unknown / distance ratio
         self.declare_parameter('epsilon', 1e-6)             # Scoring: Minimal constant to prevent a division by zero
-        self.declare_parameter('radius_meters',    0.5)     # Scoring: Radius from frontier centroid used considered
+        self.declare_parameter('radius_meters', 0.5)        # Scoring: Radius from frontier centroid used considered
 
         # Subscribers
         self.map_sub  = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
-        self.pose_sub = self.create_subscription(Odometry, '/odometry/filtered', self.pose_callback, 10)
+        self.pose_sub = self.create_subscription(Odometry, '/odom', self.pose_callback, 10)
 
         # Publishers
         self.goals_pub  = self.create_publisher(PoseArray, '/frontier_goals', 10)

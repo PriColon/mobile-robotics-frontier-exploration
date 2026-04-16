@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Behavior Coordinator Node
-==========================
 State machine that connects frontier exploration with semantic hazard avoidance.
 
 States:
