@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Semantic Hazard Classifier Node
-================================
 Detects and classifies environmental hazards using multiple sensor layers:
   Layer 1 - Create3 hardware hazards (cliff, bump, slip)
   Layer 2 - RGB camera (fire, water, smoke, debris, dark zones)
