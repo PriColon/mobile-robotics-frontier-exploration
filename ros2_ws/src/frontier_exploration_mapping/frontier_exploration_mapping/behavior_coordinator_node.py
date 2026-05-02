@@ -67,7 +67,6 @@ class BehaviorCoordinator(Node):
         self.declare_parameter('nav_failure_limit',    3)
         self.declare_parameter('visited_radius_m',     0.30)
         self.declare_parameter('hazard_overlap_dist',  0.50)
-        self.declare_parameter('use_sim_time',         False)
 
         self.deadman_timeout  = self.get_parameter('deadman_timeout_sec').value
         self.battery_thresh   = self.get_parameter('battery_threshold').value
