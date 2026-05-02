@@ -95,6 +95,30 @@ HAZARD_PRIORITY = {
 
 CRITICAL_HAZARDS = {'CLIFF', 'FIRE', 'POTHOLE', 'HAZMAT'}
 
+# Per-class HAZMAT danger ratings based on DeepHAZMAT labels.names
+HAZMAT_CLASS_LABELS = {
+    'explosive':                 100,
+    'radioactive':               100,
+    'infectious-substance':      100,
+    'inhalation-hazard':          95,
+    'poison':                     95,
+    'flammable':                  90,
+    'flammable-solid':            90,
+    'spontaneously-combustible':  90,
+    'organic-peroxide':           85,
+    'oxidizer':                   85,
+    'corrosive':                  80,
+    'non-flammable-gas':          75,
+    'oxygen':                     75,
+    'dangerous':                  70,
+}
+
+# HAZMAT classes that trigger E-stop
+CRITICAL_HAZMAT_CLASSES = {
+    'explosive', 'radioactive',
+    'infectious-substance', 'inhalation-hazard', 'poison'
+}
+
 
 # ---------------------------------------------------------------------------
 # Layer 2: RGB Visual Hazard Classifier
@@ -494,17 +518,35 @@ class SemanticHazardClassifier(Node):
                 frame = resize(self._latest_rgb.copy(), width=640)
                 detections = list(self._hazmat.update(frame))
                 if detections:
-                    for _ in detections:
-                        hazards_detected.append(('HAZMAT', LABEL_HAZMAT))
-                    mid = self._next_id()
-                    markers.append(make_cube_marker(
-                        'hazmat', mid, rx + 0.8, ry, 0.2,
-                        LABEL_HAZMAT, stamp, scale=0.5, lifetime_sec=5))
-                    markers.append(make_text_marker(
-                        'hazmat', mid, rx + 0.8, ry, 0.2,
-                        f'HAZMAT x{len(detections)}', stamp, lifetime_sec=5))
-                    self.get_logger().info(
-                        f'HAZMAT detected: {len(detections)} sign(s)')
+                    for det in detections:
+                        class_name = det.name.lower().strip()
+                        label_val = HAZMAT_CLASS_LABELS.get(
+                            class_name, LABEL_HAZMAT)
+                        hazards_detected.append(('HAZMAT', label_val))
+                        mid = self._next_id()
+                        markers.append(make_cube_marker(
+                            'hazmat', mid,
+                            rx + 0.8, ry, 0.2,
+                            label_val, stamp,
+                            scale=0.5, lifetime_sec=5))
+                        markers.append(make_text_marker(
+                            'hazmat', mid,
+                            rx + 0.8, ry, 0.2,
+                            f'{class_name.upper()} {det.confidence_string()}',
+                            stamp, lifetime_sec=5))
+                        # E-stop for critical HAZMAT classes
+                        if class_name in CRITICAL_HAZMAT_CLASSES:
+                            stop = Bool()
+                            stop.data = True
+                            self.stop_pub.publish(stop)
+                            self.get_logger().warn(
+                                f'CRITICAL HAZMAT: {class_name} '
+                                f'({det.confidence_string()}) — E-STOP')
+                        else:
+                            self.get_logger().info(
+                                f'HAZMAT: {class_name} '
+                                f'({det.confidence_string()}) '
+                                f'label={label_val}')
             except Exception as e:
                 self.get_logger().warn(f'HAZMAT error: {e}')
 
