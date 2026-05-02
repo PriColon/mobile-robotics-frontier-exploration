@@ -50,6 +50,12 @@ try:
 except ImportError:
     HAZMAT_AVAILABLE = False
 
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
 # ---------------------------------------------------------------------------
 # Hazard label constants
 # ---------------------------------------------------------------------------
@@ -355,6 +361,28 @@ class SemanticHazardClassifier(Node):
         else:
             self.get_logger().warn('deep_hazmat not available.')
 
+        # ── Fire Detection: YOLOv5 ────────────────────────────────────────
+        self._fire_model = None
+        if TORCH_AVAILABLE:
+            try:
+                pkg_share = get_package_share_directory(
+                    'frontier_exploration_mapping')
+                fire_weights = os.path.join(pkg_share, 'net', 'fire_best.pt')
+                self._fire_model = torch.hub.load(
+                    'ultralytics/yolov5', 'custom',
+                    path=fire_weights,
+                    force_reload=False,
+                    trust_repo=True,
+                    verbose=False,
+                )
+                self._fire_model.conf = 0.35
+                self._fire_model.to('cuda' if torch.cuda.is_available() else 'cpu')
+                self.get_logger().info('YOLOv5 fire model loaded successfully.')
+            except Exception as e:
+                self.get_logger().warn(f'Fire model failed to load: {e}')
+        else:
+            self.get_logger().warn('torch not available — fire detection disabled.')
+
         sensor_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.VOLATILE,
@@ -464,16 +492,38 @@ class SemanticHazardClassifier(Node):
             markers.append(make_text_marker(
                 'hw', mid, rx, ry, 0.1, 'SLIP', stamp, lifetime_sec=2))
 
-        # ── Layer 2: RGB camera ────────────────────────────────────────────
+        # ── Layer 2a: YOLOv5 Fire Detection ───────────────────────────────
+        if self._fire_model is not None and self._latest_rgb is not None:
+            try:
+                results = self._fire_model(self._latest_rgb)
+                fire_dets = results.pandas().xyxy[0]
+                if len(fire_dets) > 0:
+                    for _, det in fire_dets.iterrows():
+                        conf = float(det['confidence'])
+                        hazards_detected.append(('FIRE', LABEL_FIRE))
+                        mid = self._next_id()
+                        markers.append(make_cube_marker(
+                            'fire', mid, rx + 0.7, ry, 0.2,
+                            LABEL_FIRE, stamp, scale=0.4, lifetime_sec=3))
+                        markers.append(make_text_marker(
+                            'fire', mid, rx + 0.7, ry, 0.2,
+                            f'FIRE {int(conf*100)}%', stamp, lifetime_sec=3))
+                        self.get_logger().warn(
+                            f'FIRE detected: {int(conf*100)}% confidence')
+            except Exception as e:
+                self.get_logger().warn(f'Fire detection error: {e}')
+
+        # ── Layer 2b: RGB HSV (water, smoke, debris, dark only) ────────────
         rgb_results = []
         if self._latest_rgb is not None:
             rgb_results = classify_frame(
                 self._latest_rgb, self.grid_rows, self.grid_cols)
             for (r, c, name, value) in rgb_results:
-                if name == 'CLEAR':
+                # Skip FIRE — handled by YOLOv5 above
+                # Skip HAZMAT colour cue — handled by DeepHAZMAT below
+                if name in ('CLEAR', 'FIRE', 'HAZMAT'):
                     continue
                 hazards_detected.append((name, value))
-                # Project patch position in front of robot
                 ox = 0.4 + (self.grid_rows - r) * self.map_resolution
                 oy = (c - self.grid_cols / 2.0) * self.map_resolution
                 mid = self._next_id()
