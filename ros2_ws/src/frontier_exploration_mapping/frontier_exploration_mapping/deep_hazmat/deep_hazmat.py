@@ -1,7 +1,7 @@
 from os.path import join
 
-from deep_hazmat.detector import YoloDetection
-from deep_hazmat.feeding import ImageFeedingOptimisation
+from frontier_exploration_mapping.deep_hazmat.detector import YoloDetection
+from frontier_exploration_mapping.deep_hazmat.feeding import ImageFeedingOptimisation
 
 
 class DeepHAZMAT:
