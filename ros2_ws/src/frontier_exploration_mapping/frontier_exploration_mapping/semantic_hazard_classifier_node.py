@@ -145,13 +145,11 @@ def classify_patch(patch_bgr):
     if np.sum(fire_mask) / total > 0.12:
         return 'FIRE', LABEL_FIRE
 
-    water_mask = (H > 90) & (H < 130) & (S > 20) & (V > 80)
-    shiny_mask = (S < 30) & (V > 180)
-    if np.sum(water_mask) / total > 0.18 or np.sum(shiny_mask) / total > 0.25:
-        return 'WATER', LABEL_WATER
+    # WATER detection disabled in sim - blue walls cause false positives
+    # Water detected via hardware slip sensor (Layer 1) only
 
     smoke_mask = (S < 30) & (V > 60) & (V < 170)
-    if np.sum(smoke_mask) / total > 0.55:
+    if np.sum(smoke_mask) / total > 0.80:
         return 'SMOKE', LABEL_SMOKE
 
     hazmat_yellow = (H > 18) & (H < 36) & (S > 100) & (V > 100)
@@ -224,6 +222,8 @@ def classify_lidar(ranges, angle_min, angle_increment):
     n = len(ranges)
     arr = np.array(ranges, dtype=float)
     arr[~np.isfinite(arr)] = 0.0
+    # Filter out robot self-detection (readings at minimum range ~0.164m)
+    arr[arr < 0.20] = 0.0
 
     def sector_min(deg_start, deg_end):
         i0 = int((np.radians(deg_start) - angle_min) / angle_increment) % n
@@ -238,9 +238,9 @@ def classify_lidar(ranges, angle_min, angle_increment):
     left_min  = sector_min(60, 120)
     right_min = sector_min(-120, -60)
 
-    if front_min < 0.40 and left_min < 0.60 and right_min < 0.60:
+    if front_min < 0.20 and left_min < 0.30 and right_min < 0.30:
         return 'DEAD_END', LABEL_NARROW
-    if left_min < 0.35 and right_min < 0.35:
+    if left_min < 0.20 and right_min < 0.20:
         return 'NARROW', LABEL_NARROW
     if front_min < 0.25:
         return 'DEBRIS', LABEL_DEBRIS
