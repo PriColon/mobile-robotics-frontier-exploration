@@ -51,6 +51,43 @@ class BehaviorCoordinator(Node):
         self.declare_parameter('visited_radius_m',     0.30)
         self.declare_parameter('hazard_overlap_dist',  0.50)
 
+        self.deadman_timeout  = self.get_parameter('deadman_timeout_sec').value
+        self.battery_thresh   = self.get_parameter('battery_threshold').value
+        self.nav_fail_limit   = self.get_parameter('nav_failure_limit').value
+        self.visited_radius   = self.get_parameter('visited_radius_m').value
+        self.hazard_overlap   = self.get_parameter('hazard_overlap_dist').value
+
+        # ── State ──────────────────────────────────────────────────────────
+        self.state              = State.IDLE
+        self.frontier_goals     = []        # list of geometry_msgs/Pose
+        self.last_frontier_time = None      # for deadman switch
+        self.visited_frontiers  = []        # list of (x, y) already explored
+        self.nav_failures       = 0
+        self.current_goal       = None
+        self.robot_x            = 0.0
+        self.robot_y            = 0.0
+        self.battery_pct        = 1.0
+        self.hardware_estop     = False
+        self.operator_stop      = False
+        self.semantic_map       = None      # OccupancyGrid
+
+        # ── Nav2 Action Client ────────────────────────────────────────────
+        self._nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+        self._nav_goal_handle = None
+
+        # ── QoS ────────────────────────────────────────────────────────────
+        sensor_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+            depth=1
+        )
+
+        # ── Subscribers ───────────────────────────────────────────────────
+        self.create_subscription(
+            PoseArray, '/frontier_goals',
+            self._frontier_callback, 10)
+        self._cb_group = ReentrantCallbackGroup()
+
         self.state            = State.SELECTING
         self.frontier_goals   = []
         self.visited_set      = set()
