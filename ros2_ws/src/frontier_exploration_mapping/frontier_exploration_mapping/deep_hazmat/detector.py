@@ -2,9 +2,9 @@ import cv2
 import time
 import numpy as np
 
-from deep_hazmat.segmentation import Segmentation
-from deep_hazmat.common import Object
-from deep_hazmat.nms import non_max_suppression
+from frontier_exploration_mapping.deep_hazmat.segmentation import Segmentation
+from frontier_exploration_mapping.deep_hazmat.common import Object
+from frontier_exploration_mapping.deep_hazmat.nms import non_max_suppression
 
 color_list = [
     (220, 120, 50),  # poison

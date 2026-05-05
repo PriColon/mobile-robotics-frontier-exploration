@@ -44,7 +44,12 @@ class BehaviorCoordinator(Node):
     def __init__(self):
         super().__init__('behavior_coordinator')
 
-        self._cb_group = ReentrantCallbackGroup()
+        # ── Parameters ────────────────────────────────────────────────────
+        self.declare_parameter('deadman_timeout_sec',  5.0)
+        self.declare_parameter('battery_threshold',    0.15)
+        self.declare_parameter('nav_failure_limit',    3)
+        self.declare_parameter('visited_radius_m',     0.30)
+        self.declare_parameter('hazard_overlap_dist',  0.50)
 
         self.state            = State.SELECTING
         self.frontier_goals   = []
