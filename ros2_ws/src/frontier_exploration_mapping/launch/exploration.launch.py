@@ -1,7 +1,8 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -22,10 +23,24 @@ def generate_launch_description():
 
 
     # SLAM
-    slam_toolbox_node = Node(
-        package = 'slam_toolbox',
-        executable = 'async_slam_toolbox_node',
-        name = 'slam_toolbox',
+    slam_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare('turtlebot4_navigation'),
+                'launch',
+                'slam.launch.py'
+            ])
+        ]),
+        launch_arguments={
+            'use_sim_time': use_sim_time,
+        }.items(),
+    )
+
+    # Navigation Planner
+    navigation_planner_node = Node(
+        package = 'frontier_exploration_mapping',
+        executable = 'navigation_planner_node',
+        name = 'navigation_planner',
         output = 'screen',
         additional_env = fastdds_env,
     )
@@ -80,8 +95,8 @@ def generate_launch_description():
         use_sim_time_arg,
         use_rviz_arg,
 
-        slam_toolbox_node,
-
+        slam_launch,
+        navigation_planner_node,
         frontier_explorer_node,
         semantic_classifier_node,
         behavior_coordinator_node,

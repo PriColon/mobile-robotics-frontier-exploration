@@ -20,7 +20,7 @@ from std_msgs.msg import Bool
 from visualization_msgs.msg import Marker, MarkerArray
 from builtin_interfaces.msg import Duration
 
-from scipy.ndimage import binary_dilation, distance_transform_edt
+from scipy.ndimage import binary_dilation, binary_erosion, distance_transform_edt
 import tf2_ros
 from tf2_ros import TransformException
 from nav2_msgs.action import NavigateToPose
@@ -51,17 +51,17 @@ RECOMPUTE_WAYPOINTS_REMAINING = 2
 
 ROBOT_HALF_WIDTH = 0.20
 
-GRID_RESOLUTION    = 0.10
+GRID_RESOLUTION    = 0.05
 SNAP_SEARCH_RADIUS = 10
 
 NOISE_KERNEL_PX = 3
-WALL_DILATION_M = 0.10
+WALL_DILATION_M = 0.05
 HARD_RADIUS_M   = 0.20
 SOFT_RADIUS_M   = 0.25
 
 COST_FREE  =    0.0
 COST_SOFT  =   10.0
-COST_HARD  =   70.0
+COST_HARD  =   80.0
 COST_WALL  = 1000.0
 
 _NEIGHBOURS = [
@@ -86,47 +86,101 @@ def cell_to_world(col: int, row: int, ox: float, oy: float, res: float):
 
 
 def build_costmap(occ_msg: OccupancyGrid, grid_res: float):
+    """
+    Build a 2-D cost grid from a SLAM OccupancyGrid.
+
+    Pipeline (fixed ordering):
+      1. Downsample SLAM map to grid_res via max-pool  →  preserves every wall cell
+      2. Extract wall / free / unknown masks at grid_res
+      3. Erode free mask inward (noise removal, no bleed into walls)
+      4. Dilate wall mask outward  →  inflation zone around obstacles
+      5. Assign costs: free → distance-based tiers (COST_FREE / SOFT / HARD)
+      6. Overlay: wall and inflated cells unconditionally overwrite free space
+
+    All morphological operations happen at a single resolution (grid_res), so
+    dilation kernels are symmetric and produce even clearance in every direction.
+    """
     info   = occ_msg.info
-    res    = info.resolution
+    res    = info.resolution          # SLAM native resolution (e.g. 0.05 m)
     slam_w = info.width
     slam_h = info.height
     ox     = info.origin.position.x
     oy     = info.origin.position.y
 
-    raw  = np.array(occ_msg.data, dtype=np.int8).reshape((slam_h, slam_w))
+    raw = np.array(occ_msg.data, dtype=np.int8).reshape((slam_h, slam_w))
 
-    free = raw == 0
-    wall = raw >= 50
-    unkn = raw == -1
+    # ------------------------------------------------------------------
+    # Step 1 — Downsample to grid_res via max-pool
+    #   Use worst-case (max) pooling so any block containing a wall cell
+    #   becomes a wall cell in the coarse grid.  Unknown (-1) is treated
+    #   as 0 for the max so it doesn't mask real wall values; we recover
+    #   the unknown mask separately with a min-pool.
+    # ------------------------------------------------------------------
+    scale = max(1, int(round(grid_res / res)))   # e.g. 2 when 0.10 / 0.05
 
-    noise_kernel = np.ones((NOISE_KERNEL_PX, NOISE_KERNEL_PX), dtype=bool)
-    clean_free   = binary_dilation(free, structure=noise_kernel) & ~wall & ~unkn
+    gw = max(1, int(math.floor(slam_w / scale)))
+    gh = max(1, int(math.floor(slam_h / scale)))
 
-    dil_px       = max(1, int(round(WALL_DILATION_M / res)))
-    dil_kernel   = np.ones((2 * dil_px + 1,) * 2, dtype=bool)
+    # Crop to exact multiple so reshape is clean
+    cropped = raw[: gh * scale, : gw * scale]             # (gh*scale, gw*scale)
+
+    # Max-pool: reshape into blocks and take max per block.
+    # np.int8 treats -1 as 255 in unsigned sense, so cast to int16 first.
+    blocks = cropped.astype(np.int16).reshape(gh, scale, gw, scale)
+
+    ds_max = blocks.max(axis=(1, 3))   # (gh, gw) — wall-preserving
+    ds_min = blocks.min(axis=(1, 3))   # (gh, gw) — used to find unknown cells
+
+    # ------------------------------------------------------------------
+    # Step 2 — Masks at grid_res
+    # ------------------------------------------------------------------
+    wall = ds_max >= 50          # any occupied cell in the block → wall
+    unkn = ds_min < 0            # any unknown cell in the block → mark unknown
+    free = (~wall) & (~unkn)     # only blocks that are entirely free
+
+    # ------------------------------------------------------------------
+    # Step 3 — Erode free mask (noise removal)
+    #   Shrinks free space away from wall / unknown boundaries.
+    #   This removes isolated free specks without expanding free into walls.
+    # ------------------------------------------------------------------
+    noise_px     = max(1, int(round(NOISE_KERNEL_PX / scale)))
+    noise_kernel = np.ones((noise_px * 2 + 1,) * 2, dtype=bool)
+    clean_free   = binary_erosion(free, structure=noise_kernel, border_value=False)
+
+    # ------------------------------------------------------------------
+    # Step 4 — Dilate wall mask (inflation)
+    #   Expands wall footprint outward by WALL_DILATION_M + HARD_RADIUS_M.
+    #   Everything is at grid_res so the kernel is perfectly symmetric.
+    # ------------------------------------------------------------------
+    hard_px = max(1, int(round(HARD_RADIUS_M   / grid_res)))
+    soft_px = max(1, int(round(SOFT_RADIUS_M   / grid_res)))
+    dil_px  = max(1, int(round(WALL_DILATION_M / grid_res)))
+
+    dil_kernel   = np.ones((2 * dil_px  + 1,) * 2, dtype=bool)
     dilated_wall = binary_dilation(wall, structure=dil_kernel)
 
-    impassable = dilated_wall | unkn
+    # Distance from every cell to the nearest wall cell (in grid cells)
+    dist_from_wall = distance_transform_edt(~wall)
 
-    dist_from_wall = distance_transform_edt(~dilated_wall)
-    hard_px = HARD_RADIUS_M / res
-    soft_px = hard_px + SOFT_RADIUS_M / res
+    # ------------------------------------------------------------------
+    # Step 5 — Assign costs to clean free cells by distance tier
+    # ------------------------------------------------------------------
+    cost = np.full((gh, gw), COST_WALL, dtype=np.float32)
 
-    cost        = np.full((slam_h, slam_w), COST_WALL, dtype=np.float32)
-    traversable = clean_free & ~impassable
+    traversable = clean_free & ~dilated_wall
 
-    cost[traversable & (dist_from_wall >  soft_px)] = COST_FREE
-    cost[traversable & (dist_from_wall <= soft_px)] = COST_SOFT
-    cost[traversable & (dist_from_wall <= hard_px)] = COST_HARD
-    cost[impassable]                                = COST_WALL
+    cost[traversable & (dist_from_wall >  soft_px + dil_px)] = COST_FREE
+    cost[traversable & (dist_from_wall <= soft_px + dil_px) &
+                       (dist_from_wall >  hard_px + dil_px)] = COST_SOFT
+    cost[traversable & (dist_from_wall <= hard_px + dil_px)] = COST_HARD
 
-    gw = max(1, int(round(slam_w * res / grid_res)))
-    gh = max(1, int(round(slam_h * res / grid_res)))
-    src_cols = np.clip((np.arange(gw) * grid_res / res).astype(int), 0, slam_w - 1)
-    src_rows = np.clip((np.arange(gh) * grid_res / res).astype(int), 0, slam_h - 1)
-    grid = cost[np.ix_(src_rows, src_cols)]
+    # ------------------------------------------------------------------
+    # Step 6 — Overlay: walls unconditionally overwrite free space
+    # ------------------------------------------------------------------
+    cost[dilated_wall] = COST_WALL
+    cost[wall]         = COST_WALL   # raw wall cells always impassable
 
-    return grid, ox, oy, gw, gh
+    return cost, ox, oy, gw, gh
 
 
 def snap_to_free(grid: np.ndarray, col: int, row: int, gw: int, gh: int,
@@ -572,7 +626,6 @@ class SimpleNavigatorNode(Node):
                     waypoints, raw_wps, pgrid, pox, poy, pgw, pgh = plan
                     wp_idx          = 1 if len(waypoints) > 1 else 0
                     drive_state     = DriveState.TURNING
-                    _recompute_done = False
                     self._publish_path_markers(raw_wps, waypoints, (gx, gy))
                     self._publish_costmap(pgrid, pox, poy, pgw, pgh)
 

@@ -1,353 +1,120 @@
 #!/usr/bin/env python3
 """
-Semantic Hazard Classifier Node
-================================
-Detects and classifies environmental hazards using multiple sensor layers:
-  Layer 1 - Create3 hardware hazards (cliff, bump, slip)
-  Layer 2 - RGB camera (fire, water, smoke, debris, dark zones)
-  Layer 3 - Depth camera (potholes, glass walls, unstable terrain)
-  Layer 4 - LiDAR (narrow passages, dead ends)
-  Layer 5 - DeepHAZMAT YOLO-based HAZMAT sign detection
+Semantic Hazard Classifier Node  (YOLO-only, throttled + CPU-friendly)
 
-Publishes:
-  /semantic_map       - OccupancyGrid with hazard labels
-  /hazard_alert       - Current hazard type as String
-  /hazard_markers     - MarkerArray for RViz2 visualization (ALL layers)
-  /exploration/stop   - Bool (True if critical hazard detected)
+Key design points:
+  - YOLO runs at most once every YOLO_INTERVAL_SEC (default 1.0 s) to stay
+    CPU-friendly.  At 0.2 m/s the robot travels only 0.2 m between inferences.
+  - After every inference the result is published IMMEDIATELY on the YOLO thread
+    via a direct call to _do_publish(), bypassing the 5 Hz timer.  This means
+    detections appear (and disappear) within one inference cycle of the scene change
+    rather than waiting up to YOLO_INTERVAL_SEC for the timer to fire.
+  - _last_detections is CLEARED at the start of each inference cycle so that a
+    stale positive can never outlive its own YOLO run.
+  - The 5 Hz timer now acts only as a heartbeat keepalive — it re-publishes the
+    current (possibly empty) state so RViz2 markers don't time out between inferences.
+  - All heavy work stays on the YOLO thread; the main executor handles only
+    lightweight timer callbacks and Create3 hardware events.
 
-Fix log:
-  - Markers now published for ALL detection layers, not just RGB
-  - Markers use odom frame so they persist on the map
-  - HAZMAT detections generate distinct magenta markers
-  - Hardware hazards (cliff/bump) generate markers at robot position
-  - LiDAR hazards generate markers in front of robot
-  - Text labels added above each hazard marker
-  - Added DELETE_ALL on startup to clear stale markers
-
-Authors: Frontier Exploration Team - ASU RAS 598 Spring 2026
+Data flow:
+  camera topic → image callbacks (YOLO thread) → _pending_frame
+  YOLO thread: cooldown elapsed → decode → resize → infer → _do_publish() [immediate]
+  main executor: 5 Hz heartbeat timer → _do_publish() [keepalive only]
 """
 
+import time
+import threading
+import traceback
+import os
+
 import rclpy
+import rclpy.executors
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 
 import numpy as np
 import cv2
-import os
+
 from cv_bridge import CvBridge
 from ament_index_python.packages import get_package_share_directory
 
-from sensor_msgs.msg import Image, LaserScan
-from nav_msgs.msg import OccupancyGrid, Odometry
+from sensor_msgs.msg import CompressedImage, Image
 from std_msgs.msg import Bool, String
 from visualization_msgs.msg import Marker, MarkerArray
 
-from irobot_create_msgs.msg import HazardDetectionVector, SlipStatus
+try:
+    from irobot_create_msgs.msg import HazardDetectionVector, SlipStatus
+    CREATE3_AVAILABLE = True
+except ImportError:
+    CREATE3_AVAILABLE = False
 
+HAZMAT_AVAILABLE = False
+_hazmat_import_error = None
 try:
     from frontier_exploration_mapping.deep_hazmat import DeepHAZMAT
     HAZMAT_AVAILABLE = True
-except ImportError:
-    HAZMAT_AVAILABLE = False
-
-try:
-    import torch
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
-
-# ---------------------------------------------------------------------------
-# Hazard label constants
-# ---------------------------------------------------------------------------
-LABEL_CLEAR     = 0
-LABEL_DEBRIS    = 30
-LABEL_SMOKE     = 50
-LABEL_WATER     = 70
-LABEL_DARK      = 75
-LABEL_NARROW    = 80
-LABEL_POTHOLE   = 90
-LABEL_GLASS     = 90
-LABEL_HAZMAT    = 95
-LABEL_FIRE      = 100
-LABEL_CLIFF     = 100
-
-LABEL_COLORS = {
-    LABEL_CLEAR:   (0.2, 0.8, 0.2, 0.5),
-    LABEL_DEBRIS:  (0.9, 0.7, 0.1, 0.8),
-    LABEL_SMOKE:   (0.5, 0.5, 0.5, 0.8),
-    LABEL_WATER:   (0.1, 0.4, 0.9, 0.9),
-    LABEL_DARK:    (0.3, 0.0, 0.5, 0.8),
-    LABEL_NARROW:  (1.0, 0.5, 0.0, 0.9),
-    LABEL_POTHOLE: (0.6, 0.2, 0.0, 0.9),
-    LABEL_GLASS:   (0.7, 0.9, 1.0, 0.8),
-    LABEL_HAZMAT:  (1.0, 0.0, 1.0, 1.0),
-    LABEL_FIRE:    (1.0, 0.1, 0.0, 1.0),
-}
-
-HAZARD_PRIORITY = {
-    'CLIFF':    100,
-    'FIRE':     100,
-    'POTHOLE':  90,
-    'GLASS':    85,
-    'HAZMAT':   85,
-    'WATER':    80,
-    'DEAD_END': 80,
-    'NARROW':   70,
-    'SMOKE':    60,
-    'DARK':     60,
-    'DEBRIS':   40,
-    'CLEAR':    0,
-}
-
-CRITICAL_HAZARDS = {'CLIFF', 'FIRE', 'POTHOLE', 'HAZMAT'}
-
-# Per-class HAZMAT danger ratings based on DeepHAZMAT labels.names
-HAZMAT_CLASS_LABELS = {
-    'explosive':                 100,
-    'radioactive':               100,
-    'infectious-substance':      100,
-    'inhalation-hazard':          95,
-    'poison':                     95,
-    'flammable':                  90,
-    'flammable-solid':            90,
-    'spontaneously-combustible':  90,
-    'organic-peroxide':           85,
-    'oxidizer':                   85,
-    'corrosive':                  80,
-    'non-flammable-gas':          75,
-    'oxygen':                     75,
-    'dangerous':                  70,
-}
-
-# HAZMAT classes that trigger E-stop
-CRITICAL_HAZMAT_CLASSES = {
-    'explosive', 'radioactive',
-    'infectious-substance', 'inhalation-hazard', 'poison'
-}
+except Exception:
+    _hazmat_import_error = traceback.format_exc()
 
 
 # ---------------------------------------------------------------------------
-# Layer 2: RGB Visual Hazard Classifier
+# Tunable constants
 # ---------------------------------------------------------------------------
 
-def classify_patch(patch_bgr):
-    if patch_bgr is None or patch_bgr.size == 0:
-        return 'CLEAR', LABEL_CLEAR
+# How often YOLO is allowed to run.
+# At 0.2 m/s the robot travels 0.2 m in 1 s — scene barely changes.
+# Results are published immediately after each run so lowering this only
+# increases CPU load without improving responsiveness.
+YOLO_INTERVAL_SEC = 1.0
 
-    hsv  = cv2.cvtColor(patch_bgr, cv2.COLOR_BGR2HSV)
-    gray = cv2.cvtColor(patch_bgr, cv2.COLOR_BGR2GRAY)
-    H = hsv[:, :, 0].astype(float)
-    S = hsv[:, :, 1].astype(float)
-    V = hsv[:, :, 2].astype(float)
-    total = H.size
+# How long the YOLO worker sleeps between loop iterations when it has nothing to do.
+# 0.1 s = 10 Hz polling — cheap, keeps latency low.
+WORKER_IDLE_SLEEP_SEC = 0.1
 
-    fire_mask = (((H < 20) | (H > 160)) & (S > 120) & (V > 120))
-    if np.sum(fire_mask) / total > 0.12:
-        return 'FIRE', LABEL_FIRE
+# JPEG quality for raw→compressed conversion (lower = faster, still fine for YOLO).
+JPEG_QUALITY = 75
 
-    # WATER detection disabled in sim - blue walls cause false positives
-    # Water detected via hardware slip sensor (Layer 1) only
-
-    smoke_mask = (S < 30) & (V > 60) & (V < 170)
-    if np.sum(smoke_mask) / total > 0.80:
-        return 'SMOKE', LABEL_SMOKE
-
-    hazmat_yellow = (H > 18) & (H < 36) & (S > 100) & (V > 100)
-    if np.sum(hazmat_yellow) / total > 0.15:
-        return 'HAZMAT', LABEL_HAZMAT
-
-    edges = cv2.Canny(gray, 50, 150)
-    if np.sum(edges > 0) / total > 0.22:
-        return 'DEBRIS', LABEL_DEBRIS
-
-    if V.mean() < 45:
-        return 'DARK', LABEL_DARK
-
-    return 'CLEAR', LABEL_CLEAR
-
-
-def classify_frame(frame_bgr, rows=3, cols=4):
-    if frame_bgr is None:
-        return []
-    h, w = frame_bgr.shape[:2]
-    ph, pw = h // rows, w // cols
-    results = []
-    for r in range(rows):
-        for c in range(cols):
-            patch = frame_bgr[r * ph:(r + 1) * ph, c * pw:(c + 1) * pw]
-            name, value = classify_patch(patch)
-            results.append((r, c, name, value))
-    return results
-
-
-# ---------------------------------------------------------------------------
-# Layer 3: Depth Hazard Analysis
-# ---------------------------------------------------------------------------
-
-def classify_depth(depth_frame):
-    if depth_frame is None or depth_frame.size == 0:
-        return 'CLEAR', LABEL_CLEAR
-
-    h, w = depth_frame.shape
-    valid = depth_frame[np.isfinite(depth_frame) & (depth_frame > 0)]
-
-    if valid.size == 0:
-        return 'GLASS', LABEL_GLASS
-
-    nan_ratio = 1.0 - (valid.size / depth_frame.size)
-    if nan_ratio > 0.50:
-        return 'GLASS', LABEL_GLASS
-
-    floor = depth_frame[2 * h // 3:, w // 4: 3 * w // 4]
-    floor_valid = floor[np.isfinite(floor) & (floor > 0)]
-    if floor_valid.size > 0 and floor_valid.mean() > 1.5:
-        return 'POTHOLE', LABEL_POTHOLE
-
-    centre = depth_frame[h // 4: 3 * h // 4, w // 4: 3 * w // 4]
-    centre_valid = centre[np.isfinite(centre) & (centre > 0)]
-    if centre_valid.size > 0 and centre_valid.var() > 0.35:
-        return 'DEBRIS', LABEL_DEBRIS
-
-    return 'CLEAR', LABEL_CLEAR
-
-
-# ---------------------------------------------------------------------------
-# Layer 4: LiDAR Hazard Analysis
-# ---------------------------------------------------------------------------
-
-def classify_lidar(ranges, angle_min, angle_increment):
-    if not ranges:
-        return 'CLEAR', LABEL_CLEAR
-
-    n = len(ranges)
-    arr = np.array(ranges, dtype=float)
-    arr[~np.isfinite(arr)] = 0.0
-    # Filter out robot self-detection (readings at minimum range ~0.164m)
-    arr[arr < 0.20] = 0.0
-
-    def sector_min(deg_start, deg_end):
-        i0 = int((np.radians(deg_start) - angle_min) / angle_increment) % n
-        i1 = int((np.radians(deg_end) - angle_min) / angle_increment) % n
-        indices = (list(range(i0, i1)) if i0 < i1
-                   else list(range(i0, n)) + list(range(0, i1)))
-        vals = arr[indices]
-        vals = vals[vals > 0]
-        return vals.min() if vals.size > 0 else 999.0
-
-    front_min = sector_min(-30, 30)
-    left_min  = sector_min(60, 120)
-    right_min = sector_min(-120, -60)
-
-    if front_min < 0.20 and left_min < 0.30 and right_min < 0.30:
-        return 'DEAD_END', LABEL_NARROW
-    if left_min < 0.20 and right_min < 0.20:
-        return 'NARROW', LABEL_NARROW
-    if front_min < 0.25:
-        return 'DEBRIS', LABEL_DEBRIS
-
-    return 'CLEAR', LABEL_CLEAR
-
-
-# ---------------------------------------------------------------------------
-# Hazard Fusion
-# ---------------------------------------------------------------------------
-
-def fuse_hazards(hazard_list):
-    if not hazard_list:
-        return 'CLEAR', LABEL_CLEAR
-    return max(hazard_list, key=lambda x: HAZARD_PRIORITY.get(x[0], 0))
-
-
-# ---------------------------------------------------------------------------
-# Marker helpers
-# ---------------------------------------------------------------------------
-
-def make_cube_marker(ns, marker_id, x, y, z, label_value, stamp,
-                     frame_id='odom', scale=0.3, lifetime_sec=2):
-    m = Marker()
-    m.header.frame_id    = frame_id
-    m.header.stamp       = stamp
-    m.ns                 = ns
-    m.id                 = marker_id
-    m.type               = Marker.CUBE
-    m.action             = Marker.ADD
-    m.pose.position.x    = x
-    m.pose.position.y    = y
-    m.pose.position.z    = z
-    m.pose.orientation.w = 1.0
-    m.scale.x = scale
-    m.scale.y = scale
-    m.scale.z = scale * 0.4
-    col = LABEL_COLORS.get(label_value, (0.5, 0.5, 0.5, 0.8))
-    m.color.r = col[0]
-    m.color.g = col[1]
-    m.color.b = col[2]
-    m.color.a = col[3]
-    m.lifetime.sec     = lifetime_sec
-    m.lifetime.nanosec = 0
-    return m
-
-
-def make_text_marker(ns, marker_id, x, y, z, text, stamp,
-                     frame_id='odom', lifetime_sec=2):
-    m = Marker()
-    m.header.frame_id    = frame_id
-    m.header.stamp       = stamp
-    m.ns                 = ns + '_label'
-    m.id                 = marker_id
-    m.type               = Marker.TEXT_VIEW_FACING
-    m.action             = Marker.ADD
-    m.pose.position.x    = x
-    m.pose.position.y    = y
-    m.pose.position.z    = z + 0.3
-    m.pose.orientation.w = 1.0
-    m.scale.z  = 0.14
-    m.color.r  = 1.0
-    m.color.g  = 1.0
-    m.color.b  = 1.0
-    m.color.a  = 1.0
-    m.text     = text
-    m.lifetime.sec     = lifetime_sec
-    m.lifetime.nanosec = 0
-    return m
-
-
-# ---------------------------------------------------------------------------
-# ROS2 Node
-# ---------------------------------------------------------------------------
 
 class SemanticHazardClassifier(Node):
 
     def __init__(self):
         super().__init__('semantic_hazard_classifier')
 
-        self.declare_parameter('grid_rows',         3)
-        self.declare_parameter('grid_cols',         4)
-        self.declare_parameter('map_resolution',    0.5)
         self.declare_parameter('hazmat_confidence', 0.5)
+        self.declare_parameter('yolo_width', 320)
+        self.declare_parameter('yolo_interval_sec', YOLO_INTERVAL_SEC)
 
-        self.grid_rows      = self.get_parameter('grid_rows').value
-        self.grid_cols      = self.get_parameter('grid_cols').value
-        self.map_resolution = self.get_parameter('map_resolution').value
-        hazmat_confidence   = self.get_parameter('hazmat_confidence').value
+        hazmat_confidence  = self.get_parameter('hazmat_confidence').value
+        self._yolo_width   = self.get_parameter('yolo_width').value
+        self._yolo_interval = self.get_parameter('yolo_interval_sec').value
 
-        self.bridge     = CvBridge()
-        self._latest_rgb   = None
-        self._latest_depth = None
-        self._latest_scan  = None
-        self._hw_hazards   = []
-        self._slip_active  = False
-        self._robot_x      = 0.0
-        self._robot_y      = 0.0
-        self._marker_id    = 0
+        self.bridge = CvBridge()
 
-        # Layer 5: DeepHAZMAT
+        # ── Shared state ─────────────────────────────────────────────────
+        # _pending_frame: latest raw JPEG bytes from the camera callback.
+        #   Written by image callbacks (YOLO thread).
+        #   Read+cleared by YOLO inference (YOLO thread).
+        #   Both sides are on the SAME thread → no lock needed here.
+        self._pending_frame: bytes | None = None
+
+        # _last_detections: result of the last successful inference.
+        #   Written by YOLO thread, read by publish timer (main thread) → needs lock.
+        self._result_lock     = threading.Lock()
+        self._last_detections = []
+
+        # Timestamp of the last YOLO run (monotonic, YOLO thread only).
+        self._last_yolo_time = 0.0
+
+        # ── DeepHAZMAT ────────────────────────────────────────────────────
         self._hazmat = None
         if HAZMAT_AVAILABLE:
             try:
-                pkg_share = get_package_share_directory(
-                    'frontier_exploration_mapping')
-                net_dir = os.path.join(pkg_share, 'net')
+                pkg_share = get_package_share_directory('frontier_exploration_mapping')
+                net_dir   = os.path.join(pkg_share, 'net')
+                for fname in ('yolo.cfg', 'yolo.weights', 'labels.names'):
+                    fpath = os.path.join(net_dir, fname)
+                    if not os.path.exists(fpath):
+                        raise FileNotFoundError(f'Missing YOLO file: {fpath}')
                 self._hazmat = DeepHAZMAT(
                     k=0,
                     net_directory=net_dir,
@@ -355,310 +122,231 @@ class SemanticHazardClassifier(Node):
                     nms_threshold=0.3,
                     segmentation_enabled=False,
                 )
-                self.get_logger().info('DeepHAZMAT loaded successfully.')
+                self.get_logger().info(
+                    f'DeepHAZMAT loaded '
+                    f'(yolo_width={self._yolo_width}, '
+                    f'interval={self._yolo_interval:.1f}s).')
             except Exception as e:
-                self.get_logger().warn(f'DeepHAZMAT failed to load: {e}')
+                self.get_logger().error(
+                    f'DeepHAZMAT failed to load: {e}\n{traceback.format_exc()}')
         else:
-            self.get_logger().warn('deep_hazmat not available.')
+            self.get_logger().error(
+                f'DeepHAZMAT import failed:\n{_hazmat_import_error}')
 
-        # ── Fire Detection: YOLOv5 ────────────────────────────────────────
-        self._fire_model = None
-        if TORCH_AVAILABLE:
-            try:
-                pkg_share = get_package_share_directory(
-                    'frontier_exploration_mapping')
-                fire_weights = os.path.join(pkg_share, 'net', 'fire_best.pt')
-                self._fire_model = torch.hub.load(
-                    'ultralytics/yolov5', 'custom',
-                    path=fire_weights,
-                    force_reload=False,
-                    trust_repo=True,
-                    verbose=False,
-                )
-                self._fire_model.conf = 0.35
-                self._fire_model.to('cuda' if torch.cuda.is_available() else 'cpu')
-                self.get_logger().info('YOLOv5 fire model loaded successfully.')
-            except Exception as e:
-                self.get_logger().warn(f'Fire model failed to load: {e}')
-        else:
-            self.get_logger().warn('torch not available — fire detection disabled.')
-
+        # ── Image helper node (lives entirely on the YOLO thread) ─────────
+        # This node has NO publishers and is never added to the main executor.
+        # The main rclpy.spin() will never touch it.
         sensor_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.VOLATILE,
-            depth=1
+            depth=1,          # depth=1: only keep the newest frame, drop the rest
         )
 
-        # Subscribers
-        self.create_subscription(Image, '/oakd/rgb/preview/image_raw',
-                                 self._rgb_callback, sensor_qos)
-        self.create_subscription(Image, '/oakd/rgb/preview/depth',
-                                 self._depth_callback, sensor_qos)
-        self.create_subscription(LaserScan, '/scan',
-                                 self._scan_callback, sensor_qos)
-        self.create_subscription(HazardDetectionVector, '/hazard_detection',
-                                 self._hazard_hw_callback, 10)
-        self.create_subscription(SlipStatus, '/slip_status',
-                                 self._slip_callback, 10)
-        self.create_subscription(Odometry, '/odom',
-                                 self._odom_callback, sensor_qos)
+        self._image_node = rclpy.create_node('hazmat_image_helper')
+        self._image_node.create_subscription(
+            CompressedImage,
+            '/oakd/rgb/preview/image_raw/compressed',
+            self._compressed_cb,
+            sensor_qos,
+        )
+        self._image_node.create_subscription(
+            Image,
+            '/oakd/rgb/preview/image_raw',
+            self._raw_cb,
+            sensor_qos,
+        )
 
-        # Publishers
-        self.semantic_map_pub = self.create_publisher(
-            OccupancyGrid, '/semantic_map', 10)
-        self.alert_pub  = self.create_publisher(
-            String,      '/hazard_alert',    10)
-        self.stop_pub   = self.create_publisher(
-            Bool,        '/exploration/stop', 10)
-        self.marker_pub = self.create_publisher(
-            MarkerArray, '/hazard_markers',   10)
+        self._image_executor = rclpy.executors.SingleThreadedExecutor()
+        self._image_executor.add_node(self._image_node)
 
-        # Clear stale markers after 1 second
-        self._clear_timer = self.create_timer(1.0, self._clear_stale_markers_once)
+        # ── YOLO background thread ────────────────────────────────────────
+        self._yolo_thread = threading.Thread(target=self._yolo_worker, daemon=True)
+        self._yolo_thread.start()
 
-        # Main processing at 10 Hz
-        self.create_timer(0.1, self._process)
+        # ── Main-node subscribers (no images) ─────────────────────────────
+        if CREATE3_AVAILABLE:
+            self.create_subscription(
+                HazardDetectionVector, '/hazard_detection',
+                self._hw_hazard_cb, 10)
+            self.create_subscription(
+                SlipStatus, '/slip_status',
+                self._slip_cb, 10)
 
-        self.get_logger().info('Semantic Hazard Classifier started.')
+        # ── Publishers ────────────────────────────────────────────────────
+        self.alert_pub  = self.create_publisher(String,      '/hazard_alert',     10)
+        self.stop_pub   = self.create_publisher(Bool,        '/exploration/stop',  10)
+        self.marker_pub = self.create_publisher(MarkerArray, '/hazard_markers',    10)
 
-    # ── Callbacks ──────────────────────────────────────────────────────────
+        # 5 Hz heartbeat — re-publishes current state so RViz2 markers don't time out.
+        # The real publish happens immediately after each YOLO inference on the YOLO thread.
+        self.create_timer(0.2, self._publish_results)
 
-    def _rgb_callback(self, msg):
+        self.get_logger().info(
+            f'Semantic Hazard Classifier started. '
+            f'YOLO will run at most every {self._yolo_interval:.1f} s.')
+
+    # ── Image callbacks — called on YOLO thread by _image_executor ────────
+    # These only store the latest JPEG bytes; they do NOT decode or run YOLO.
+    # Storing raw bytes is a fast memcopy — essentially free.
+
+    def _compressed_cb(self, msg: CompressedImage):
+        # Overwrite whatever was pending — we only ever need the newest frame.
+        self._pending_frame = bytes(msg.data)
+
+    def _raw_cb(self, msg: Image):
+        # Raw Image: encode to JPEG on this thread so downstream handling is uniform.
         try:
-            self._latest_rgb = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
+            frame = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
+            ok, buf = cv2.imencode(
+                '.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+            if ok:
+                self._pending_frame = buf.tobytes()
         except Exception as e:
-            self.get_logger().warn(f'RGB error: {e}')
+            print(f'[image helper] raw decode error: {e}')
 
-    def _depth_callback(self, msg):
+    def _hw_hazard_cb(self, msg):
+        pass   # placeholder for Create3 hardware hazard handling
+
+    def _slip_cb(self, msg):
+        pass   # placeholder for slip detection
+
+    # ── YOLO worker ────────────────────────────────────────────────────────
+    #
+    # Loop structure:
+    #   1. spin_once — drives image callbacks to fill _pending_frame (fast, non-blocking)
+    #   2. Check cooldown — if not enough time has passed, sleep and continue
+    #   3. Grab frame — if nothing new arrived, sleep and continue
+    #   4. CLEAR _last_detections immediately — stale result is gone from this point
+    #   5. Decode + resize + infer
+    #   6. Store result and publish IMMEDIATELY (don't wait for the 5 Hz timer)
+    #   7. Sleep WORKER_IDLE_SLEEP_SEC before next iteration
+
+    def _yolo_worker(self):
         try:
-            self._latest_depth = self.bridge.imgmsg_to_cv2(msg, '32FC1')
-        except Exception as e:
-            self.get_logger().warn(f'Depth error: {e}')
+            from imutils import resize as imutils_resize
+        except ImportError:
+            print('[YOLO worker] imutils not installed — exiting thread.')
+            return
 
-    def _scan_callback(self, msg):
-        self._latest_scan = msg
+        self.get_logger().info('[YOLO worker] thread started.')
 
-    def _hazard_hw_callback(self, msg):
-        self._hw_hazards = [h.type for h in msg.detections]
+        while rclpy.ok():
+            # ── Step 1: drain the image subscriber queue (fast) ──────────
+            self._image_executor.spin_once(timeout_sec=0.0)
 
-    def _slip_callback(self, msg):
-        self._slip_active = msg.is_slipping
+            # ── Step 2: cooldown check ────────────────────────────────────
+            now = time.monotonic()
+            if now - self._last_yolo_time < self._yolo_interval:
+                time.sleep(WORKER_IDLE_SLEEP_SEC)
+                continue
 
-    def _odom_callback(self, msg):
-        self._robot_x = msg.pose.pose.position.x
-        self._robot_y = msg.pose.pose.position.y
+            # ── Step 3: grab the latest frame ────────────────────────────
+            data = self._pending_frame
+            if data is None or self._hazmat is None:
+                time.sleep(WORKER_IDLE_SLEEP_SEC)
+                continue
+            self._pending_frame = None  # consume
 
-    def _clear_stale_markers_once(self):
-        """Run once after startup to clear any leftover RViz2 markers."""
-        ma = MarkerArray()
-        m = Marker()
-        m.action = Marker.DELETEALL
-        ma.markers.append(m)
-        self.marker_pub.publish(ma)
-        self.get_logger().info('Cleared stale markers.')
-        self._clear_timer.cancel()
+            # ── Step 4: CLEAR stale result immediately ────────────────────
+            # From this moment forward, _last_detections reflects THIS inference
+            # cycle.  Any result from a previous cycle is gone — it will not be
+            # re-broadcast by the heartbeat timer while we're inferring.
+            with self._result_lock:
+                self._last_detections = []
 
-    # ── Main Processing ─────────────────────────────────────────────────────
+            # ── Step 5: decode → resize → infer ──────────────────────────
+            arr   = np.frombuffer(data, dtype=np.uint8)
+            frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            if frame is None:
+                time.sleep(WORKER_IDLE_SLEEP_SEC)
+                continue
 
-    def _process(self):
+            small = imutils_resize(frame, width=self._yolo_width)
+
+            try:
+                t0         = time.monotonic()
+                results    = self._hazmat.update(small)
+                elapsed_ms = (time.monotonic() - t0) * 1000
+                detections = list(results) if results else []
+                self.get_logger().info(
+                    f'[YOLO worker] inference took {elapsed_ms:.0f} ms, '
+                    f'{len(detections)} detection(s).')
+            except Exception as e:
+                detections = []
+                print(f'[YOLO worker] inference error: {e}')
+
+            # ── Step 6: store result and publish IMMEDIATELY ──────────────
+            # Don't wait for the 5 Hz timer — publish the new result right now
+            # so detections appear (and disappear) within one inference cycle.
+            with self._result_lock:
+                self._last_detections = detections
+            self._do_publish()
+
+            self._last_yolo_time = time.monotonic()
+
+            # ── Step 7: yield CPU before next iteration ───────────────────
+            time.sleep(WORKER_IDLE_SLEEP_SEC)
+
+    # ── Shared publish logic (called from both YOLO thread and heartbeat timer) ──
+
+    def _do_publish(self):
+        with self._result_lock:
+            detections = list(self._last_detections)
+
         stamp = self.get_clock().now().to_msg()
-        hazards_detected = []
-        markers = []
-        rx, ry = self._robot_x, self._robot_y
+        ma    = MarkerArray()
 
-        # ── Layer 1: Hardware ──────────────────────────────────────────────
-        if 2 in self._hw_hazards:
-            hazards_detected.append(('CLIFF', LABEL_CLIFF))
-            mid = self._next_id()
-            markers.append(make_cube_marker(
-                'hw', mid, rx, ry, 0.1, LABEL_CLIFF, stamp,
-                scale=0.4, lifetime_sec=3))
-            markers.append(make_text_marker(
-                'hw', mid, rx, ry, 0.1, 'CLIFF', stamp, lifetime_sec=3))
+        if detections:
+            for det in detections:
+                self.get_logger().info(
+                    f'HAZMAT detected: {det}',
+                    throttle_duration_sec=1.0)
 
-        if 1 in self._hw_hazards:
-            hazards_detected.append(('DEBRIS', LABEL_DEBRIS))
-            mid = self._next_id()
-            markers.append(make_cube_marker(
-                'hw', mid, rx, ry, 0.1, LABEL_DEBRIS, stamp, lifetime_sec=2))
-            markers.append(make_text_marker(
-                'hw', mid, rx, ry, 0.1, 'BUMP', stamp, lifetime_sec=2))
+            alert      = String()
+            alert.data = 'HAZMAT'
+            self.alert_pub.publish(alert)
 
-        if self._slip_active:
-            hazards_detected.append(('WATER', LABEL_WATER))
-            mid = self._next_id()
-            markers.append(make_cube_marker(
-                'hw', mid, rx, ry, 0.1, LABEL_WATER, stamp, lifetime_sec=2))
-            markers.append(make_text_marker(
-                'hw', mid, rx, ry, 0.1, 'SLIP', stamp, lifetime_sec=2))
+            m                    = Marker()
+            m.header.frame_id    = 'base_link'
+            m.header.stamp       = stamp
+            m.ns                 = 'hazmat'
+            m.id                 = 0
+            m.type               = Marker.CYLINDER
+            m.action             = Marker.ADD
+            m.pose.position.z    = 0.5
+            m.pose.orientation.w = 1.0
+            m.scale.x = m.scale.y = 0.3
+            m.scale.z            = 1.0
+            m.color.r            = 1.0
+            m.color.g            = 0.0
+            m.color.b            = 1.0
+            m.color.a            = 0.85
+            m.lifetime.sec       = 2
+            ma.markers.append(m)
 
-        # ── Layer 2a: YOLOv5 Fire Detection ───────────────────────────────
-        if self._fire_model is not None and self._latest_rgb is not None:
-            try:
-                results = self._fire_model(self._latest_rgb)
-                fire_dets = results.pandas().xyxy[0]
-                if len(fire_dets) > 0:
-                    for _, det in fire_dets.iterrows():
-                        conf = float(det['confidence'])
-                        hazards_detected.append(('FIRE', LABEL_FIRE))
-                        mid = self._next_id()
-                        markers.append(make_cube_marker(
-                            'fire', mid, rx + 0.7, ry, 0.2,
-                            LABEL_FIRE, stamp, scale=0.4, lifetime_sec=3))
-                        markers.append(make_text_marker(
-                            'fire', mid, rx + 0.7, ry, 0.2,
-                            f'FIRE {int(conf*100)}%', stamp, lifetime_sec=3))
-                        self.get_logger().warn(
-                            f'FIRE detected: {int(conf*100)}% confidence')
-            except Exception as e:
-                self.get_logger().warn(f'Fire detection error: {e}')
+        else:
+            alert      = String()
+            alert.data = 'CLEAR'
+            self.alert_pub.publish(alert)
 
-        # ── Layer 2b: RGB HSV (water, smoke, debris, dark only) ────────────
-        rgb_results = []
-        if self._latest_rgb is not None:
-            rgb_results = classify_frame(
-                self._latest_rgb, self.grid_rows, self.grid_cols)
-            for (r, c, name, value) in rgb_results:
-                # Skip FIRE — handled by YOLOv5 above
-                # Skip HAZMAT colour cue — handled by DeepHAZMAT below
-                if name in ('CLEAR', 'FIRE', 'HAZMAT'):
-                    continue
-                hazards_detected.append((name, value))
-                ox = 0.4 + (self.grid_rows - r) * self.map_resolution
-                oy = (c - self.grid_cols / 2.0) * self.map_resolution
-                mid = self._next_id()
-                markers.append(make_cube_marker(
-                    'rgb', mid, rx + ox, ry + oy, 0.05, value, stamp,
-                    scale=self.map_resolution * 0.85, lifetime_sec=2))
-                markers.append(make_text_marker(
-                    'rgb', mid, rx + ox, ry + oy, 0.05, name, stamp))
+            clear        = Marker()
+            clear.action = Marker.DELETEALL
+            ma.markers.append(clear)
 
-        # ── Layer 3: Depth ─────────────────────────────────────────────────
-        if self._latest_depth is not None:
-            d_name, d_val = classify_depth(self._latest_depth)
-            if d_name != 'CLEAR':
-                hazards_detected.append((d_name, d_val))
-                mid = self._next_id()
-                markers.append(make_cube_marker(
-                    'depth', mid, rx + 0.6, ry, 0.05, d_val, stamp,
-                    scale=0.35, lifetime_sec=2))
-                markers.append(make_text_marker(
-                    'depth', mid, rx + 0.6, ry, 0.05,
-                    f'DEPTH:{d_name}', stamp))
+        self.marker_pub.publish(ma)
 
-        # ── Layer 4: LiDAR ─────────────────────────────────────────────────
-        if self._latest_scan is not None:
-            s = self._latest_scan
-            l_name, l_val = classify_lidar(
-                list(s.ranges), s.angle_min, s.angle_increment)
-            if l_name != 'CLEAR':
-                hazards_detected.append((l_name, l_val))
-                mid = self._next_id()
-                markers.append(make_cube_marker(
-                    'lidar', mid, rx + 0.5, ry, 0.1, l_val, stamp,
-                    scale=0.4, lifetime_sec=2))
-                markers.append(make_text_marker(
-                    'lidar', mid, rx + 0.5, ry, 0.1,
-                    f'LIDAR:{l_name}', stamp))
+    # ── Heartbeat timer — main executor, keeps RViz2 markers alive ─────────
 
-        # ── Layer 5: DeepHAZMAT ────────────────────────────────────────────
-        if self._hazmat is not None and self._latest_rgb is not None:
-            try:
-                from imutils import resize
-                frame = resize(self._latest_rgb.copy(), width=640)
-                detections = list(self._hazmat.update(frame))
-                if detections:
-                    for det in detections:
-                        class_name = det.name.lower().strip()
-                        label_val = HAZMAT_CLASS_LABELS.get(
-                            class_name, LABEL_HAZMAT)
-                        hazards_detected.append(('HAZMAT', label_val))
-                        mid = self._next_id()
-                        markers.append(make_cube_marker(
-                            'hazmat', mid,
-                            rx + 0.8, ry, 0.2,
-                            label_val, stamp,
-                            scale=0.5, lifetime_sec=5))
-                        markers.append(make_text_marker(
-                            'hazmat', mid,
-                            rx + 0.8, ry, 0.2,
-                            f'{class_name.upper()} {det.confidence_string()}',
-                            stamp, lifetime_sec=5))
-                        # E-stop for critical HAZMAT classes
-                        if class_name in CRITICAL_HAZMAT_CLASSES:
-                            stop = Bool()
-                            stop.data = True
-                            self.stop_pub.publish(stop)
-                            self.get_logger().warn(
-                                f'CRITICAL HAZMAT: {class_name} '
-                                f'({det.confidence_string()}) — E-STOP')
-                        else:
-                            self.get_logger().info(
-                                f'HAZMAT: {class_name} '
-                                f'({det.confidence_string()}) '
-                                f'label={label_val}')
-            except Exception as e:
-                self.get_logger().warn(f'HAZMAT error: {e}')
+    def _publish_results(self):
+        # Just re-publish whatever the YOLO thread last stored.
+        # The real "new result" publish already happened on the YOLO thread.
+        self._do_publish()
 
-        # ── Fuse ───────────────────────────────────────────────────────────
-        top_name, top_value = fuse_hazards(hazards_detected)
+    def destroy_node(self):
+        self._image_executor.shutdown()
+        self._image_node.destroy_node()
+        super().destroy_node()
 
-        # ── Publish markers ────────────────────────────────────────────────
-        if markers:
-            ma = MarkerArray()
-            ma.markers = markers
-            self.marker_pub.publish(ma)
-
-        # ── Publish semantic map ───────────────────────────────────────────
-        self._publish_semantic_map(rgb_results, stamp)
-
-        # ── Publish alert ──────────────────────────────────────────────────
-        alert = String()
-        alert.data = top_name
-        self.alert_pub.publish(alert)
-
-        # ── E-stop if critical ─────────────────────────────────────────────
-        if top_name in CRITICAL_HAZARDS:
-            stop = Bool()
-            stop.data = True
-            self.stop_pub.publish(stop)
-            self.get_logger().warn(
-                f'CRITICAL HAZARD: {top_name} — E-STOP TRIGGERED')
-
-        if top_name != 'CLEAR':
-            self.get_logger().info(
-                f'Hazard: {top_name} (label={top_value})')
-
-    def _publish_semantic_map(self, rgb_results, stamp):
-        grid_msg = OccupancyGrid()
-        grid_msg.header.frame_id = 'odom'
-        grid_msg.header.stamp    = stamp
-        grid_msg.info.resolution = self.map_resolution
-        grid_msg.info.width      = self.grid_cols
-        grid_msg.info.height     = self.grid_rows
-        grid_msg.info.origin.position.x = (
-            self._robot_x - self.grid_rows * self.map_resolution / 2)
-        grid_msg.info.origin.position.y = (
-            self._robot_y - self.grid_cols * self.map_resolution / 2)
-        grid_msg.info.origin.orientation.w = 1.0
-
-        data = [0] * (self.grid_rows * self.grid_cols)
-        for (r, c, name, value) in rgb_results:
-            idx = r * self.grid_cols + c
-            if 0 <= idx < len(data):
-                data[idx] = value
-        grid_msg.data = data
-        self.semantic_map_pub.publish(grid_msg)
-
-    def _next_id(self):
-        mid = self._marker_id
-        self._marker_id += 1
-        return mid
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
 
 def main(args=None):
     rclpy.init(args=args)
@@ -669,7 +357,10 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == '__main__':

@@ -13,7 +13,11 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/exploration.launch.py']),
-        ('share/' + package_name + '/net', glob('net/*')),
+        ('share/' + package_name + '/net', [
+            'net/yolo.cfg',
+            'net/yolo.weights',
+            'net/labels.names',
+        ]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
