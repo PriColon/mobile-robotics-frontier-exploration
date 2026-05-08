@@ -9,20 +9,21 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
 
-    fastdds_env = {
-        'RMW_IMPLEMENTATION':   'rmw_fastrtps_cpp',
-        'ROS_DISCOVERY_SERVER': '192.168.1.18:11811',
-        'ROS_SUPER_CLIENT':     'True',
-        'ROS_DOMAIN_ID':        '0',
-    }
+    # ── Launch Arguments ──────────────────────────────────────────────────
+    use_sim_time_arg = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='false',
+        description='Use simulation clock (true = sim, false = real robot)')
 
-    use_sim_time_arg = DeclareLaunchArgument('use_sim_time', default_value='false', description='Use simulation (Gazebo) clock if true')
-    use_rviz_arg = DeclareLaunchArgument('use_rviz', default_value='true', description='Launch RViz2 visualiser')
+    use_rviz_arg = DeclareLaunchArgument(
+        'use_rviz',
+        default_value='true',
+        description='Launch RViz2 visualiser')
+
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_rviz     = LaunchConfiguration('use_rviz')
 
-
-    # SLAM
+    # ── SLAM ──────────────────────────────────────────────────────────────
     slam_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
@@ -36,22 +37,21 @@ def generate_launch_description():
         }.items(),
     )
 
-    # Navigation Planner
+    # ── Navigation Planner ─────────────────────────────────────────────────
     navigation_planner_node = Node(
-        package = 'frontier_exploration_mapping',
+        package    = 'frontier_exploration_mapping',
         executable = 'navigation_planner_node',
-        name = 'navigation_planner',
-        output = 'screen',
-        additional_env = fastdds_env,
+        name       = 'navigation_planner',
+        output     = 'screen',
+        parameters = [{'use_sim_time': use_sim_time}],
     )
 
-    # Frontier Explorer
+    # ── Frontier Explorer ──────────────────────────────────────────────────
     frontier_explorer_node = Node(
-        package = 'frontier_exploration_mapping',
+        package    = 'frontier_exploration_mapping',
         executable = 'frontier_explorer_node',
-        name = 'frontier_explorer',
-        output = 'screen',
-        additional_env = fastdds_env,
+        name       = 'frontier_explorer',
+        output     = 'screen',
         parameters = [{
             'use_sim_time':     use_sim_time,
             'min_cluster_size': 10,
@@ -62,34 +62,32 @@ def generate_launch_description():
         }],
     )
 
-    # Semantic Hazard Classifier
+    # ── Semantic Hazard Classifier ─────────────────────────────────────────
     semantic_classifier_node = Node(
-        package = 'frontier_exploration_mapping',
+        package    = 'frontier_exploration_mapping',
         executable = 'semantic_hazard_classifier_node',
-        name = 'semantic_hazard_classifier',
-        output = 'screen',
-        additional_env = fastdds_env,
+        name       = 'semantic_hazard_classifier',
+        output     = 'screen',
+        parameters = [{'use_sim_time': use_sim_time}],
     )
 
-    # Behavior Coordinator
+    # ── Behavior Coordinator ───────────────────────────────────────────────
     behavior_coordinator_node = Node(
-        package = 'frontier_exploration_mapping',
+        package    = 'frontier_exploration_mapping',
         executable = 'behavior_coordinator_node',
-        name = 'behavior_coordinator',
-        output = 'screen',
-        additional_env = fastdds_env,
+        name       = 'behavior_coordinator',
+        output     = 'screen',
+        parameters = [{'use_sim_time': use_sim_time}],
     )
 
-    # Rviz2
+    # ── RViz2 ──────────────────────────────────────────────────────────────
     rviz_node = Node(
-        package = 'rviz2',
+        package    = 'rviz2',
         executable = 'rviz2',
-        name = 'rviz2',
-        output = 'screen',
-        condition = IfCondition(use_rviz),
-        additional_env = fastdds_env,
+        name       = 'rviz2',
+        output     = 'screen',
+        condition  = IfCondition(use_rviz),
     )
-
 
     return LaunchDescription([
         use_sim_time_arg,
@@ -100,6 +98,5 @@ def generate_launch_description():
         frontier_explorer_node,
         semantic_classifier_node,
         behavior_coordinator_node,
-
         rviz_node,
     ])
