@@ -205,7 +205,14 @@ class SemanticHazardClassifier(Node):
             print(f'[image helper] raw decode error: {e}')
 
     def _hw_hazard_cb(self, msg):
-        pass   # placeholder for Create3 hardware hazard handling
+        from irobot_create_msgs.msg import HazardDetection
+        for det in msg.detections:
+            if det.type in (HazardDetection.CLIFF,):
+                stop = Bool()
+                stop.data = True
+                self.stop_pub.publish(stop)
+                self.get_logger().warn(f'CLIFF detected — E-STOP triggered')
+                return
 
     def _slip_cb(self, msg):
         pass   # placeholder for slip detection
