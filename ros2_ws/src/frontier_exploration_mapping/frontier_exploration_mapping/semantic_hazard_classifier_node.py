@@ -1,36 +1,49 @@
 #!/usr/bin/env python3
 """
-Semantic Hazard Classifier Node  (YOLO-only, throttled + CPU-friendly)
+Semantic Hazard Classifier Node
 
-Key design points:
-  - YOLO runs at most once every YOLO_INTERVAL_SEC (default 1.0 s) to stay
-    CPU-friendly.  At 0.2 m/s the robot travels only 0.2 m between inferences.
-  - After every inference the result is published IMMEDIATELY on the YOLO thread
-    via a direct call to _do_publish(), bypassing the 5 Hz timer.  This means
-    detections appear (and disappear) within one inference cycle of the scene change
-    rather than waiting up to YOLO_INTERVAL_SEC for the timer to fire.
-  - _last_detections is CLEARED at the start of each inference cycle so that a
-    stale positive can never outlive its own YOLO run.
-  - The 5 Hz timer now acts only as a heartbeat keepalive — it re-publishes the
-    current (possibly empty) state so RViz2 markers don't time out between inferences.
-  - All heavy work stays on the YOLO thread; the main executor handles only
-    lightweight timer callbacks and Create3 hardware events.
+Architecture
+────────────
+  Camera → image callback (YOLO thread) → _pending_frame + capture timestamp
+  YOLO thread (throttled): decode → resize → infer → publish alert immediately
+  Localization thread: for each detection, look up tf at capture time → place
+                       a map-frame marker at the estimated HAZMAT location
 
-Data flow:
-  camera topic → image callbacks (YOLO thread) → _pending_frame
-  YOLO thread: cooldown elapsed → decode → resize → infer → _do_publish() [immediate]
-  main executor: 5 Hz heartbeat timer → _do_publish() [keepalive only]
+Retroactive localization
+────────────────────────
+  The OAK-D stamps each frame at hardware capture time (msg.header.stamp).
+  When YOLO finds a detection, we record that stamp and push a job onto a
+  small queue.  A separate localization thread then calls tf2's
+  lookup_transform(target_frame='map', source_frame='base_link',
+  time=capture_stamp) — asking "where was the robot when this photo was
+  taken?"  tf2 buffers ~10 s of history, so as long as YOLO finishes within
+  that window (it takes ~160 ms) the lookup always succeeds.
+
+  The result is a persistent MarkerArray on /hazmat_map_markers that
+  accumulates every confirmed HAZMAT location in the map frame.  This is
+  separate from the transient /hazmat_markers which just shows the current
+  frame's detection status.
+
+Topics published
+────────────────
+  /hazard_alert        std_msgs/String      "HAZMAT" | "CLEAR"  (per inference)
+  /hazard_markers      MarkerArray          transient detection cylinder
+  /hazmat_map_markers  MarkerArray          persistent map-frame HAZMAT pins
+  /exploration/stop    std_msgs/Bool        True on critical hazard
 """
 
 import time
 import threading
 import traceback
 import os
+import queue
+import math
 
 import rclpy
 import rclpy.executors
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+from rclpy.time import Time as RosTime
 
 import numpy as np
 import cv2
@@ -38,9 +51,12 @@ import cv2
 from cv_bridge import CvBridge
 from ament_index_python.packages import get_package_share_directory
 
+import tf2_ros
+
 from sensor_msgs.msg import CompressedImage, Image
 from std_msgs.msg import Bool, String
 from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Point
 
 try:
     from irobot_create_msgs.msg import HazardDetectionVector, SlipStatus
@@ -57,22 +73,14 @@ except Exception:
     _hazmat_import_error = traceback.format_exc()
 
 
-# ---------------------------------------------------------------------------
-# Tunable constants
-# ---------------------------------------------------------------------------
+# ── Tunable constants ────────────────────────────────────────────────────────
 
-# How often YOLO is allowed to run.
-# At 0.2 m/s the robot travels 0.2 m in 1 s — scene barely changes.
-# Results are published immediately after each run so lowering this only
-# increases CPU load without improving responsiveness.
-YOLO_INTERVAL_SEC = 1.0
-
-# How long the YOLO worker sleeps between loop iterations when it has nothing to do.
-# 0.1 s = 10 Hz polling — cheap, keeps latency low.
-WORKER_IDLE_SLEEP_SEC = 0.1
-
-# JPEG quality for raw→compressed conversion (lower = faster, still fine for YOLO).
-JPEG_QUALITY = 75
+YOLO_INTERVAL_SEC     = 1.0   # minimum gap between YOLO runs
+WORKER_IDLE_SLEEP_SEC = 0.1   # sleep when nothing to do
+JPEG_QUALITY          = 75    # raw→compressed conversion quality
+TF_BUFFER_SEC         = 10.0  # how long tf2 keeps history (default is fine)
+TF_TIMEOUT_SEC        = 0.5   # how long to wait for a tf lookup
+LOC_QUEUE_MAX         = 20    # max pending localization jobs
 
 
 class SemanticHazardClassifier(Node):
@@ -80,30 +88,36 @@ class SemanticHazardClassifier(Node):
     def __init__(self):
         super().__init__('semantic_hazard_classifier')
 
-        self.declare_parameter('hazmat_confidence', 0.5)
-        self.declare_parameter('yolo_width', 320)
-        self.declare_parameter('yolo_interval_sec', YOLO_INTERVAL_SEC)
+        self.declare_parameter('hazmat_confidence',  0.5)
+        self.declare_parameter('yolo_width',         320)
+        self.declare_parameter('yolo_interval_sec',  YOLO_INTERVAL_SEC)
 
-        hazmat_confidence  = self.get_parameter('hazmat_confidence').value
-        self._yolo_width   = self.get_parameter('yolo_width').value
+        hazmat_confidence   = self.get_parameter('hazmat_confidence').value
+        self._yolo_width    = self.get_parameter('yolo_width').value
         self._yolo_interval = self.get_parameter('yolo_interval_sec').value
 
         self.bridge = CvBridge()
 
         # ── Shared state ─────────────────────────────────────────────────
-        # _pending_frame: latest raw JPEG bytes from the camera callback.
-        #   Written by image callbacks (YOLO thread).
-        #   Read+cleared by YOLO inference (YOLO thread).
-        #   Both sides are on the SAME thread → no lock needed here.
-        self._pending_frame: bytes | None = None
+        self._pending_frame:    bytes | None = None
+        self._pending_stamp:    object       = None   # ROS stamp from msg.header
 
-        # _last_detections: result of the last successful inference.
-        #   Written by YOLO thread, read by publish timer (main thread) → needs lock.
         self._result_lock     = threading.Lock()
         self._last_detections = []
+        self._last_yolo_time  = 0.0
 
-        # Timestamp of the last YOLO run (monotonic, YOLO thread only).
-        self._last_yolo_time = 0.0
+        # ── tf2 buffer — receives /tf and /tf_static on the main executor ─
+        self._tf_buffer   = tf2_ros.Buffer(cache_time=rclpy.duration.Duration(seconds=TF_BUFFER_SEC))
+        self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
+
+        # ── Localization job queue ────────────────────────────────────────
+        # Each item: {'stamp': ROS stamp, 'detections': [...], 'frame_id': str}
+        self._loc_queue = queue.Queue(maxsize=LOC_QUEUE_MAX)
+
+        # Accumulated map-frame HAZMAT markers
+        self._map_markers: list[Marker] = []
+        self._map_marker_lock = threading.Lock()
+        self._next_map_marker_id = 0
 
         # ── DeepHAZMAT ────────────────────────────────────────────────────
         self._hazmat = None
@@ -133,15 +147,12 @@ class SemanticHazardClassifier(Node):
             self.get_logger().error(
                 f'DeepHAZMAT import failed:\n{_hazmat_import_error}')
 
-        # ── Image helper node (lives entirely on the YOLO thread) ─────────
-        # This node has NO publishers and is never added to the main executor.
-        # The main rclpy.spin() will never touch it.
+        # ── Image helper node (YOLO thread only) ─────────────────────────
         sensor_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.VOLATILE,
-            depth=1,          # depth=1: only keep the newest frame, drop the rest
+            depth=1,
         )
-
         self._image_node = rclpy.create_node('hazmat_image_helper')
         self._image_node.create_subscription(
             CompressedImage,
@@ -155,15 +166,18 @@ class SemanticHazardClassifier(Node):
             self._raw_cb,
             sensor_qos,
         )
-
         self._image_executor = rclpy.executors.SingleThreadedExecutor()
         self._image_executor.add_node(self._image_node)
 
-        # ── YOLO background thread ────────────────────────────────────────
-        self._yolo_thread = threading.Thread(target=self._yolo_worker, daemon=True)
+        # ── Background threads ────────────────────────────────────────────
+        self._yolo_thread = threading.Thread(
+            target=self._yolo_worker, daemon=True, name='yolo_worker')
+        self._loc_thread  = threading.Thread(
+            target=self._localization_worker, daemon=True, name='loc_worker')
         self._yolo_thread.start()
+        self._loc_thread.start()
 
-        # ── Main-node subscribers (no images) ─────────────────────────────
+        # ── Main-node subscribers ─────────────────────────────────────────
         if CREATE3_AVAILABLE:
             self.create_subscription(
                 HazardDetectionVector, '/hazard_detection',
@@ -173,126 +187,247 @@ class SemanticHazardClassifier(Node):
                 self._slip_cb, 10)
 
         # ── Publishers ────────────────────────────────────────────────────
-        self.alert_pub  = self.create_publisher(String,      '/hazard_alert',     10)
-        self.stop_pub   = self.create_publisher(Bool,        '/exploration/stop',  10)
-        self.marker_pub = self.create_publisher(MarkerArray, '/hazard_markers',    10)
+        self.alert_pub      = self.create_publisher(String,      '/hazard_alert',       10)
+        self.stop_pub       = self.create_publisher(Bool,        '/exploration/stop',    10)
+        self.marker_pub     = self.create_publisher(MarkerArray, '/hazard_markers',      10)
+        self.map_marker_pub = self.create_publisher(MarkerArray, '/hazmat_map_markers',  10)
 
-        # 5 Hz heartbeat — re-publishes current state so RViz2 markers don't time out.
-        # The real publish happens immediately after each YOLO inference on the YOLO thread.
-        self.create_timer(0.2, self._publish_results)
+        # 5 Hz heartbeat — keeps RViz2 markers alive between YOLO cycles
+        self.create_timer(0.2, self._heartbeat)
 
         self.get_logger().info(
-            f'Semantic Hazard Classifier started. '
-            f'YOLO will run at most every {self._yolo_interval:.1f} s.')
+            f'Semantic Hazard Classifier started.  '
+            f'interval={self._yolo_interval:.1f}s  width={self._yolo_width}px\n'
+            f'  Retroactive localization: ENABLED  '
+            f'(tf buffer={TF_BUFFER_SEC:.0f}s)')
 
-    # ── Image callbacks — called on YOLO thread by _image_executor ────────
-    # These only store the latest JPEG bytes; they do NOT decode or run YOLO.
-    # Storing raw bytes is a fast memcopy — essentially free.
+    # ── Image callbacks (YOLO thread) ──────────────────────────────────────
 
     def _compressed_cb(self, msg: CompressedImage):
-        # Overwrite whatever was pending — we only ever need the newest frame.
         self._pending_frame = bytes(msg.data)
+        self._pending_stamp = msg.header.stamp      # hardware capture time
 
     def _raw_cb(self, msg: Image):
-        # Raw Image: encode to JPEG on this thread so downstream handling is uniform.
         try:
             frame = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
             ok, buf = cv2.imencode(
                 '.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
             if ok:
                 self._pending_frame = buf.tobytes()
+                self._pending_stamp = msg.header.stamp
         except Exception as e:
             print(f'[image helper] raw decode error: {e}')
 
-    def _hw_hazard_cb(self, msg):
-        pass   # placeholder for Create3 hardware hazard handling
-
-    def _slip_cb(self, msg):
-        pass   # placeholder for slip detection
+    def _hw_hazard_cb(self, msg): pass
+    def _slip_cb(self,     msg): pass
 
     # ── YOLO worker ────────────────────────────────────────────────────────
-    #
-    # Loop structure:
-    #   1. spin_once — drives image callbacks to fill _pending_frame (fast, non-blocking)
-    #   2. Check cooldown — if not enough time has passed, sleep and continue
-    #   3. Grab frame — if nothing new arrived, sleep and continue
-    #   4. CLEAR _last_detections immediately — stale result is gone from this point
-    #   5. Decode + resize + infer
-    #   6. Store result and publish IMMEDIATELY (don't wait for the 5 Hz timer)
-    #   7. Sleep WORKER_IDLE_SLEEP_SEC before next iteration
 
     def _yolo_worker(self):
         try:
             from imutils import resize as imutils_resize
         except ImportError:
-            print('[YOLO worker] imutils not installed — exiting thread.')
+            self.get_logger().error('[YOLO] imutils not installed — thread exiting.')
             return
 
-        self.get_logger().info('[YOLO worker] thread started.')
+        self.get_logger().info('[YOLO] worker started.')
 
         while rclpy.ok():
-            # ── Step 1: drain the image subscriber queue (fast) ──────────
+            # Drain image subscriber queue (non-blocking)
             self._image_executor.spin_once(timeout_sec=0.0)
 
-            # ── Step 2: cooldown check ────────────────────────────────────
-            now = time.monotonic()
-            if now - self._last_yolo_time < self._yolo_interval:
+            # Cooldown
+            if time.monotonic() - self._last_yolo_time < self._yolo_interval:
                 time.sleep(WORKER_IDLE_SLEEP_SEC)
                 continue
 
-            # ── Step 3: grab the latest frame ────────────────────────────
-            data = self._pending_frame
+            # Grab latest frame + its hardware timestamp
+            data  = self._pending_frame
+            stamp = self._pending_stamp
             if data is None or self._hazmat is None:
                 time.sleep(WORKER_IDLE_SLEEP_SEC)
                 continue
-            self._pending_frame = None  # consume
+            self._pending_frame = None
 
-            # ── Step 4: CLEAR stale result immediately ────────────────────
-            # From this moment forward, _last_detections reflects THIS inference
-            # cycle.  Any result from a previous cycle is gone — it will not be
-            # re-broadcast by the heartbeat timer while we're inferring.
+            # Clear stale result immediately
             with self._result_lock:
                 self._last_detections = []
 
-            # ── Step 5: decode → resize → infer ──────────────────────────
+            # Decode → resize
             arr   = np.frombuffer(data, dtype=np.uint8)
             frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             if frame is None:
                 time.sleep(WORKER_IDLE_SLEEP_SEC)
                 continue
-
             small = imutils_resize(frame, width=self._yolo_width)
 
+            # Inference
             try:
-                t0         = time.monotonic()
                 results    = self._hazmat.update(small)
-                elapsed_ms = (time.monotonic() - t0) * 1000
                 detections = list(results) if results else []
-                self.get_logger().info(
-                    f'[YOLO worker] inference took {elapsed_ms:.0f} ms, '
-                    f'{len(detections)} detection(s).')
             except Exception as e:
                 detections = []
-                print(f'[YOLO worker] inference error: {e}')
+                self.get_logger().error(f'[YOLO] inference error: {e}')
 
-            # ── Step 6: store result and publish IMMEDIATELY ──────────────
-            # Don't wait for the 5 Hz timer — publish the new result right now
-            # so detections appear (and disappear) within one inference cycle.
+            # Store + publish immediately
             with self._result_lock:
                 self._last_detections = detections
-            self._do_publish()
+            self._publish_current(detections)
+
+            if detections:
+                self.get_logger().info(
+                    f'[YOLO] {len(detections)} detection(s) — '
+                    f'queuing retroactive localization')
+                # Push localization job (non-blocking — drop if queue full)
+                try:
+                    self._loc_queue.put_nowait({
+                        'stamp':      stamp,
+                        'detections': detections,
+                        'frame_id':   'base_link',
+                    })
+                except queue.Full:
+                    self.get_logger().warn('[YOLO] localization queue full — dropping job')
 
             self._last_yolo_time = time.monotonic()
-
-            # ── Step 7: yield CPU before next iteration ───────────────────
             time.sleep(WORKER_IDLE_SLEEP_SEC)
 
-    # ── Shared publish logic (called from both YOLO thread and heartbeat timer) ──
+    # ── Localization worker ────────────────────────────────────────────────
+    #
+    # Pops detection jobs off the queue, looks up the robot's map-frame pose
+    # at the hardware capture timestamp, then projects a fixed distance
+    # forward along the robot's heading to estimate where the HAZMAT is on
+    # the wall directly in front of the camera.
+    #
+    # Proof-of-concept approximation
+    # ───────────────────────────────
+    #   marker_x = robot_x + PROJECTION_DIST * cos(yaw)
+    #   marker_y = robot_y + PROJECTION_DIST * sin(yaw)
+    #
+    # yaw is extracted from the quaternion returned by tf2.  The projection
+    # distance is tunable via HAZMAT_PROJECTION_DIST_M.  Future refinement
+    # can replace this with a proper ray-cast using the detection's bounding
+    # box centre and the camera's known FOV.
 
-    def _do_publish(self):
-        with self._result_lock:
-            detections = list(self._last_detections)
+    # How far in front of the robot to place the wall marker (metres).
+    # At 0.2 m/s the robot is never closer than ~0.3 m to a wall before
+    # Nav2 stops it, so 1.0 m is a reasonable mid-field guess.
+    HAZMAT_PROJECTION_DIST_M = 1.0
 
+    def _localization_worker(self):
+        self.get_logger().info('[LOC] worker started.')
+
+        while rclpy.ok():
+            try:
+                job = self._loc_queue.get(timeout=1.0)
+            except queue.Empty:
+                continue
+
+            stamp      = job['stamp']
+            detections = job['detections']
+
+            if stamp is None:
+                self.get_logger().warn('[LOC] job has no timestamp — skipping')
+                continue
+
+            # Convert ROS stamp to rclpy Time for tf2
+            ros_time = RosTime(
+                seconds=stamp.sec,
+                nanoseconds=stamp.nanosec,
+                clock_type=self.get_clock().clock_type,
+            )
+
+            try:
+                transform = self._tf_buffer.lookup_transform(
+                    target_frame='map',
+                    source_frame='base_link',
+                    time=ros_time,
+                    timeout=rclpy.duration.Duration(seconds=TF_TIMEOUT_SEC),
+                )
+            except (tf2_ros.LookupException,
+                    tf2_ros.ConnectivityException,
+                    tf2_ros.ExtrapolationException) as e:
+                self.get_logger().warn(f'[LOC] tf lookup failed: {e}')
+                continue
+
+            # Robot position in map
+            rx = transform.transform.translation.x
+            ry = transform.transform.translation.y
+
+            # Extract yaw from quaternion (z-axis rotation only — 2D map)
+            qx = transform.transform.rotation.x
+            qy = transform.transform.rotation.y
+            qz = transform.transform.rotation.z
+            qw = transform.transform.rotation.w
+            yaw = 2.0 * math.atan2(qz, qw)   # standard 2D yaw extraction
+
+            # Project forward along the robot's heading
+            d  = self.HAZMAT_PROJECTION_DIST_M
+            mx = rx + d * math.cos(yaw)
+            my = ry + d * math.sin(yaw)
+
+            self.get_logger().info(
+                f'[LOC] robot ({rx:.2f}, {ry:.2f}) yaw={math.degrees(yaw):.1f}° '
+                f'→ HAZMAT projected to ({mx:.2f}, {my:.2f})  '
+                f'classes: {[det.name for det in detections]}')
+
+            # Build persistent markers — one cylinder + one text label per detection
+            now_stamp = self.get_clock().now().to_msg()
+            with self._map_marker_lock:
+                for det in detections:
+                    # ── Cylinder marker ──────────────────────────────────
+                    cyl                    = Marker()
+                    cyl.header.frame_id    = 'map'
+                    cyl.header.stamp       = now_stamp
+                    cyl.ns                 = 'hazmat_locations'
+                    cyl.id                 = self._next_map_marker_id
+                    self._next_map_marker_id += 1
+                    cyl.type               = Marker.CYLINDER
+                    cyl.action             = Marker.ADD
+                    cyl.pose.position.x    = mx
+                    cyl.pose.position.y    = my
+                    cyl.pose.position.z    = 0.5
+                    cyl.pose.orientation.w = 1.0
+                    cyl.scale.x            = 0.4
+                    cyl.scale.y            = 0.4
+                    cyl.scale.z            = 1.0
+                    cyl.color.r            = 1.0
+                    cyl.color.g            = 0.5
+                    cyl.color.b            = 0.0
+                    cyl.color.a            = 0.9
+                    cyl.lifetime.sec       = 0   # persistent
+                    self._map_markers.append(cyl)
+
+                    # ── Text label above the cylinder ────────────────────
+                    txt                    = Marker()
+                    txt.header.frame_id    = 'map'
+                    txt.header.stamp       = now_stamp
+                    txt.ns                 = 'hazmat_labels'
+                    txt.id                 = self._next_map_marker_id
+                    self._next_map_marker_id += 1
+                    txt.type               = Marker.TEXT_VIEW_FACING
+                    txt.action             = Marker.ADD
+                    txt.pose.position.x    = mx
+                    txt.pose.position.y    = my
+                    txt.pose.position.z    = 1.2   # above the cylinder
+                    txt.pose.orientation.w = 1.0
+                    txt.scale.z            = 0.25  # text height in metres
+                    txt.color.r            = 1.0
+                    txt.color.g            = 1.0
+                    txt.color.b            = 1.0
+                    txt.color.a            = 1.0
+                    txt.text               = det.name.upper()
+                    txt.lifetime.sec       = 0
+                    self._map_markers.append(txt)
+
+                ma = MarkerArray()
+                ma.markers = list(self._map_markers)
+
+            self.map_marker_pub.publish(ma)
+
+    # ── Transient detection publish ────────────────────────────────────────
+
+    def _publish_current(self, detections):
+        """Publish the current frame's detection state immediately."""
         stamp = self.get_clock().now().to_msg()
         ma    = MarkerArray()
 
@@ -309,7 +444,7 @@ class SemanticHazardClassifier(Node):
             m                    = Marker()
             m.header.frame_id    = 'base_link'
             m.header.stamp       = stamp
-            m.ns                 = 'hazmat'
+            m.ns                 = 'hazmat_current'
             m.id                 = 0
             m.type               = Marker.CYLINDER
             m.action             = Marker.ADD
@@ -330,17 +465,28 @@ class SemanticHazardClassifier(Node):
             self.alert_pub.publish(alert)
 
             clear        = Marker()
+            clear.ns     = 'hazmat_current'
             clear.action = Marker.DELETEALL
             ma.markers.append(clear)
 
         self.marker_pub.publish(ma)
 
-    # ── Heartbeat timer — main executor, keeps RViz2 markers alive ─────────
+    # ── Heartbeat timer (main executor) ───────────────────────────────────
 
-    def _publish_results(self):
-        # Just re-publish whatever the YOLO thread last stored.
-        # The real "new result" publish already happened on the YOLO thread.
-        self._do_publish()
+    def _heartbeat(self):
+        """Re-publish current state and accumulated map markers to keep RViz2 alive."""
+        with self._result_lock:
+            detections = list(self._last_detections)
+        self._publish_current(detections)
+
+        # Re-publish persistent map markers so RViz2 doesn't time them out
+        with self._map_marker_lock:
+            if self._map_markers:
+                ma = MarkerArray()
+                ma.markers = list(self._map_markers)
+                self.map_marker_pub.publish(ma)
+
+    # ── Cleanup ───────────────────────────────────────────────────────────
 
     def destroy_node(self):
         self._image_executor.shutdown()
