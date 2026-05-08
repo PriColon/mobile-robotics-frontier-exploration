@@ -45,7 +45,7 @@ class Object:
         return str(self)
 
     def draw(self, image, padding=0.1):
-        from deep_hazmat import visualizer
+        from . import visualizer
         h, w = image.shape[:2]
         visualizer.draw_lines(image, self.points)
         visualizer.draw_box(

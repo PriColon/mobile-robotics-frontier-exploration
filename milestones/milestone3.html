@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Milestone 3 — Final Documentation & Analysis</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css"/>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})"></script>
+  <style>
+    :root {
+      --maroon: #8C1D40;
+      --maroon-dark: #6B1530;
+      --gold: #FFC627;
+      --dark: #1a1a1a;
+      --text: #2c2c2c;
+      --muted: #666;
+      --bg: #f9f9f9;
+      --card: #ffffff;
+      --border: #e0e0e0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Source Sans 3', 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+
+    /* ── Header ── */
+    header { background: var(--maroon); color: white; padding: 0; }
+    .header-top { background: var(--dark); padding: 10px 40px; display: flex; align-items: center; gap: 16px; }
+    .header-top span { color: var(--gold); font-size: 13px; font-weight: 600; letter-spacing: 1px; }
+    .header-body { padding: 48px 40px 40px; max-width: 1100px; margin: 0 auto; }
+    .header-body h1 { font-family: 'Playfair Display', serif; font-size: 2.2rem; font-weight: 700; margin-bottom: 8px; }
+    .header-body .sub { color: rgba(255,255,255,0.8); font-size: 1rem; }
+    .meta-pills { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+    .pill { background: rgba(255,198,39,0.2); border: 1px solid var(--gold); color: var(--gold); padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+
+    /* ── Layout ── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 40px; }
+    .two-col { display: grid; grid-template-columns: 260px 1fr; gap: 40px; align-items: start; }
+
+    /* ── Sidebar TOC ── */
+    .toc { position: sticky; top: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; }
+    .toc h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
+    .toc a { display: block; padding: 6px 0 6px 10px; color: var(--text); text-decoration: none; font-size: 14px; border-left: 2px solid transparent; transition: all 0.2s; }
+    .toc a:hover { border-left-color: var(--maroon); color: var(--maroon); }
+    .toc a.sub { padding-left: 22px; font-size: 13px; color: var(--muted); }
+    .toc .toc-badge { display: inline-block; background: var(--gold); color: var(--maroon-dark); font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+
+    /* ── Content ── */
+    .content section { margin-bottom: 56px; }
+    .content h2 { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--maroon); border-bottom: 3px solid var(--gold); padding-bottom: 10px; margin-bottom: 20px; }
+    .content h3 { font-size: 1.15rem; color: var(--dark); margin: 24px 0 10px; font-weight: 600; }
+    .content h4 { font-size: 1rem; color: var(--maroon); margin: 16px 0 8px; font-weight: 600; }
+    .content p { margin-bottom: 14px; }
+    .content ul, .content ol { margin: 10px 0 14px 20px; }
+    .content li { margin-bottom: 6px; }
+
+    /* ── Cards ── */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+    .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .card-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .card h4 { font-size: 1rem; color: var(--maroon); margin-bottom: 8px; font-weight: 600; }
+
+    /* ── Evidence / callout blocks ── */
+    .evidence { background: #fff8e1; border-left: 4px solid var(--gold); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 16px 0; font-size: 14px; }
+    .evidence strong { color: var(--maroon); }
+    .info-box { background: #e8f4fd; border-left: 4px solid #2196F3; border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 16px 0; font-size: 14px; }
+    .warn-box { background: #fff3e0; border-left: 4px solid #FF9800; border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 16px 0; font-size: 14px; }
+    .success-box { background: #e8f5e9; border-left: 4px solid #4CAF50; border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 16px 0; font-size: 14px; }
+
+    /* ── Code ── */
+    pre { background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.6; margin: 16px 0; font-family: 'JetBrains Mono', 'Consolas', monospace; }
+    code { font-family: 'JetBrains Mono', 'Consolas', monospace; }
+    p code, li code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: var(--maroon); }
+
+    /* ── Math / LaTeX ── */
+    .math-block { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; text-align: center; overflow-x: auto; }
+    .math-label { font-size: 12px; color: var(--muted); text-align: right; margin-top: 8px; font-style: italic; }
+
+    /* ── Graphical Abstract ── */
+    .graphical-abstract { background: linear-gradient(135deg, var(--maroon) 0%, var(--maroon-dark) 100%); border-radius: 12px; padding: 40px; color: white; margin-bottom: 24px; position: relative; overflow: hidden; }
+    .graphical-abstract::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 80% 50%, rgba(255,198,39,0.15), transparent 60%); }
+    .ga-title { font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--gold); margin-bottom: 8px; position: relative; }
+    .ga-sub { font-size: 0.9rem; color: rgba(255,255,255,0.7); margin-bottom: 24px; position: relative; }
+    .ga-flow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; position: relative; }
+    .ga-node { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,198,39,0.4); border-radius: 8px; padding: 12px 16px; text-align: center; min-width: 120px; }
+    .ga-node .icon { font-size: 1.6rem; margin-bottom: 4px; }
+    .ga-node .label { font-size: 11px; font-weight: 600; color: var(--gold); text-transform: uppercase; letter-spacing: 0.05em; }
+    .ga-node .desc { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+    .ga-arrow { font-size: 1.2rem; color: var(--gold); padding: 0 8px; opacity: 0.7; }
+    .ga-results { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 24px; position: relative; }
+    .ga-stat { background: rgba(255,198,39,0.15); border: 1px solid rgba(255,198,39,0.3); border-radius: 8px; padding: 12px; text-align: center; }
+    .ga-stat .num { font-size: 1.6rem; font-weight: 700; color: var(--gold); font-family: 'Playfair Display', serif; }
+    .ga-stat .lbl { font-size: 11px; color: rgba(255,255,255,0.65); margin-top: 2px; }
+
+    /* ── Benchmarking ── */
+    .bench-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+    .bench-table th { background: var(--maroon); color: white; padding: 10px 14px; text-align: left; font-size: 13px; }
+    .bench-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+    .bench-table tr:nth-child(even) td { background: var(--bg); }
+    .bench-table tr:hover td { background: #fff8e1; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-green { background: #e8f5e9; color: #2e7d32; }
+    .badge-yellow { background: #fff8e1; color: #f57f17; }
+    .badge-red { background: #ffebee; color: #c62828; }
+
+    /* ── Chart placeholder ── */
+    .chart-placeholder { background: var(--card); border: 2px dashed var(--border); border-radius: 10px; padding: 40px; text-align: center; color: var(--muted); margin: 16px 0; }
+    .chart-placeholder .chart-icon { font-size: 2rem; margin-bottom: 8px; }
+
+    /* ── Contribution table ── */
+    .contrib-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .contrib-table th { background: var(--maroon); color: white; padding: 12px 16px; text-align: left; }
+    .contrib-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .contrib-table tr:nth-child(even) td { background: var(--bg); }
+    .commit-link { display: inline-block; background: #1e1e1e; color: #d4d4d4; padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; text-decoration: none; }
+    .commit-link:hover { background: var(--maroon); color: white; }
+
+    /* ── Code links ── */
+    .code-link-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .code-link-card { background: #1e1e1e; border-radius: 8px; padding: 16px; }
+    .code-link-card .file { color: var(--gold); font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
+    .code-link-card .desc { color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 4px; }
+    .code-link-card a { color: #64b5f6; font-size: 12px; text-decoration: none; margin-top: 8px; display: block; }
+    .code-link-card a:hover { color: white; text-decoration: underline; }
+
+    /* ── Ethical ── */
+    .ethical-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 20px 0; }
+    .ethical-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .ethical-card .icon { font-size: 1.8rem; margin-bottom: 8px; }
+    .ethical-card h4 { color: var(--maroon); margin-bottom: 8px; }
+    .ethical-card p { font-size: 13px; color: var(--muted); }
+
+    /* ── Status banner ── */
+    .status-banner { background: linear-gradient(90deg, var(--maroon), #b5244e); color: white; padding: 16px 24px; border-radius: 8px; display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+    .status-banner .status-icon { font-size: 1.5rem; }
+    .status-banner .status-text { flex: 1; }
+    .status-banner .status-text strong { display: block; font-size: 1rem; }
+    .status-banner .status-text span { font-size: 13px; opacity: 0.8; }
+
+    /* ── Video placeholder ── */
+    .video-placeholder { background: #000; border-radius: 10px; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; color: white; text-align: center; margin: 16px 0; }
+    .video-placeholder .play-btn { font-size: 3rem; margin-bottom: 8px; }
+
+    @media(max-width:768px) {
+      .two-col { grid-template-columns: 1fr; }
+      .toc { display: none; }
+      .card-grid, .card-grid-3, .ethical-grid, .code-link-grid, .ga-results { grid-template-columns: 1fr; }
+      .page { padding: 20px; }
+      .header-body { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="header-top">
+    <span>RAS 598 · Mobile Robotics · ASU Spring 2026</span>
+    <span>·</span>
+    <span>Group 1</span>
+  </div>
+  <div class="header-body">
+    <p class="sub" style="margin-bottom:8px;">Milestone 3 — Final Documentation &amp; Analysis</p>
+    <h1>Autonomous Frontier Exploration<br/>with Semantic Hazard Mapping</h1>
+    <p class="sub">Scientific Dossier: Validation, Benchmarking &amp; Ethical Evaluation</p>
+    <div class="meta-pills">
+      <span class="pill">TurtleBot4 Lite</span>
+      <span class="pill">ROS 2 Jazzy</span>
+      <span class="pill">SLAM Toolbox</span>
+      <span class="pill">DeepHAZMAT + YOLOv5</span>
+      <span class="pill">May 8, 2026</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── Main Content ── -->
+<div class="page">
+  <div class="two-col">
+
+    <!-- ── TOC Sidebar ── -->
+    <aside>
+      <nav class="toc">
+        <h3>Contents</h3>
+        <a href="#abstract">1. Graphical Abstract</a>
+        <a href="#algorithm">2. Algorithm</a>
+        <a class="sub" href="#algorithm-frontier">2.1 Frontier Explorer</a>
+        <a class="sub" href="#algorithm-hazard">2.2 Hazard Classifier</a>
+        <a class="sub" href="#algorithm-nav">2.3 Navigation Planner</a>
+        <a class="sub" href="#algorithm-coord">2.4 Behavior Coordinator</a>
+        <a href="#results">3. Results &amp; Benchmarking</a>
+        <a class="sub" href="#results-trials">3.1 Trial Data</a>
+        <a class="sub" href="#results-hazmat">3.2 Hazard Detection</a>
+        <a class="sub" href="#results-mapping">3.3 Mapping Coverage</a>
+        <a href="#ethical">4. Ethical Impact</a>
+        <a href="#code-links">5. Code Links</a>
+        <a href="#contributions">6. Contributions</a>
+      </nav>
+    </aside>
+
+    <!-- ── Main Content ── -->
+    <main class="content">
+
+      <!-- ── 1. Graphical Abstract ── -->
+      <section id="abstract">
+        <h2>1. Graphical Abstract</h2>
+
+        <div class="graphical-abstract">
+          <div class="ga-title">Autonomous Frontier Exploration with Semantic Hazard Mapping</div>
+          <div class="ga-sub">TurtleBot4 Lite · ROS 2 Jazzy · ASU ISTB12 · Spring 2026</div>
+
+          <div class="ga-flow">
+            <div class="ga-node">
+              <div class="icon">🗺️</div>
+              <div class="label">SLAM</div>
+              <div class="desc">slam_toolbox<br/>OccupancyGrid</div>
+            </div>
+            <div class="ga-arrow">→</div>
+            <div class="ga-node">
+              <div class="icon">🔍</div>
+              <div class="label">Frontier Explorer</div>
+              <div class="desc">Nearest-first<br/>wavefront scoring</div>
+            </div>
+            <div class="ga-arrow">→</div>
+            <div class="ga-node">
+              <div class="icon">🧠</div>
+              <div class="label">Behavior Coord.</div>
+              <div class="desc">State machine<br/>goal management</div>
+            </div>
+            <div class="ga-arrow">→</div>
+            <div class="ga-node">
+              <div class="icon">🚗</div>
+              <div class="label">Nav Planner</div>
+              <div class="desc">A* + costmap<br/>P-controller</div>
+            </div>
+            <div class="ga-arrow">→</div>
+            <div class="ga-node">
+              <div class="icon">⚠️</div>
+              <div class="label">Hazard Detect.</div>
+              <div class="desc">DeepHAZMAT<br/>YOLOv5 Fire</div>
+            </div>
+          </div>
+
+          <div class="ga-results">
+            <div class="ga-stat">
+              <div class="num">5</div>
+              <div class="lbl">Custom ROS 2 Nodes</div>
+            </div>
+            <div class="ga-stat">
+              <div class="num">13</div>
+              <div class="lbl">HAZMAT Classes</div>
+            </div>
+            <div class="ga-stat">
+              <div class="num">360°</div>
+              <div class="lbl">LiDAR Coverage</div>
+            </div>
+            <div class="ga-stat">
+              <div class="num">~1 Hz</div>
+              <div class="lbl">Map Update Rate</div>
+            </div>
+          </div>
+        </div>
+
+        <p>Our system autonomously explores unknown environments using a TurtleBot4 Lite ground robot, simultaneously building a 2D occupancy map via SLAM and detecting semantic hazards (HAZMAT signs, fire, cliffs, potholes) using a multi-layer sensor fusion pipeline. The robot selects and navigates to frontier cells — boundaries between known-free and unknown space — using a nearest-first wavefront strategy with A* path planning on a dynamically-built costmap.</p>
+      </section>
+
+      <!-- ── 2. Algorithm ── -->
+      <section id="algorithm">
+        <h2>2. Algorithm</h2>
+
+        <p>The system comprises four tightly-coupled custom ROS 2 nodes. Each implements a distinct algorithmic layer in the autonomy stack.</p>
+
+        <!-- 2.1 Frontier Explorer -->
+        <h3 id="algorithm-frontier">2.1 Frontier Explorer Node</h3>
+        <p>The frontier explorer subscribes to the SLAM occupancy grid and identifies frontier cells — free cells adjacent to unknown cells. Clusters are formed using connected-component labeling and scored by distance from the robot using a nearest-first wavefront metric:</p>
+
+        <div class="math-block">
+          $$\text{score}(c) = \frac{1}{d(r, c) + \varepsilon}$$
+          <div class="math-label">Eq. 1 — Frontier scoring (wavefront / nearest-first)</div>
+        </div>
+
+        <p>where $d(r, c)$ is the Euclidean distance from robot position $r$ to frontier centroid $c$, and $\varepsilon = 10^{-6}$ prevents division by zero. Clusters with fewer than $N_{\min} = 10$ cells are discarded as noise.</p>
+
+        <div class="math-block">
+          $$\mathcal{F} = \left\{ c \in \text{Free} \;\middle|\; \exists\, n \in \mathcal{N}(c) : n \in \text{Unknown} \;\land\; \mathcal{N}(c) \cap \text{Occupied} = \emptyset \right\}$$
+          <div class="math-label">Eq. 2 — Frontier cell definition</div>
+        </div>
+
+        <pre><code># frontier_explorer_node.py — core scoring (line 94)
+score = 1.0 / (dist + epsilon)  # nearest frontier first (wavefront)</code></pre>
+
+        <!-- 2.2 Hazard Classifier -->
+        <h3 id="algorithm-hazard">2.2 Semantic Hazard Classifier Node</h3>
+        <p>The hazard classifier fuses five detection layers into a single hazard alert:</p>
+
+        <div class="card">
+          <h4>Detection Layer Stack</h4>
+          <table class="bench-table">
+            <tr><th>Layer</th><th>Sensor</th><th>Method</th><th>Output</th></tr>
+            <tr><td>1 — Hardware</td><td>Create3 IR / IMU</td><td>Topic subscription</td><td>CLIFF, BUMP, SLIP</td></tr>
+            <tr><td>2a — Fire</td><td>OAK-D RGB</td><td>YOLOv5 (fire_best.pt)</td><td>FIRE + confidence</td></tr>
+            <tr><td>2b — Visual</td><td>OAK-D RGB</td><td>HSV segmentation</td><td>SMOKE, DEBRIS, DARK</td></tr>
+            <tr><td>3 — Depth</td><td>OAK-D Depth</td><td>Floor plane analysis</td><td>POTHOLE, GLASS</td></tr>
+            <tr><td>4 — LiDAR</td><td>RPLIDAR A1M8</td><td>Sector min-range</td><td>NARROW, DEAD_END</td></tr>
+            <tr><td>5 — HAZMAT</td><td>OAK-D RGB</td><td>DeepHAZMAT YOLOv3-tiny</td><td>13 HAZMAT classes</td></tr>
+          </table>
+        </div>
+
+        <p>The LiDAR sector analysis accounts for the +90° mounting offset confirmed in the TurtleBot4 Lite URDF (<code>rpy="0 0 π/2"</code>):</p>
+
+        <div class="math-block">
+          $$\theta_{\text{robot}} = \theta_{\text{LiDAR}} - \frac{\pi}{2}$$
+          <div class="math-label">Eq. 3 — LiDAR angle correction for RPLIDAR A1M8 mounting offset</div>
+        </div>
+
+        <div class="math-block">
+          $$d_{\text{front}} = \min_{i \in [-120°, -60°]} r_i, \quad d_{\text{left}} = \min_{i \in [-30°, 30°]} r_i, \quad d_{\text{right}} = \min_{i \in [150°, 210°]} r_i$$
+          <div class="math-label">Eq. 4 — Sector minimum distances (robot frame)</div>
+        </div>
+
+        <p>HAZMAT inference uses DeepHAZMAT's YOLOv3-tiny architecture (13 classes, 7M parameters, 15.8 GFLOPs), running at ~30ms per frame on an RTX 5070 Ti GPU with CUDA 13.1.</p>
+
+        <!-- 2.3 Navigation Planner -->
+        <h3 id="algorithm-nav">2.3 Navigation Planner Node</h3>
+        <p>The navigation planner implements a custom <code>/navigate_to_pose</code> action server replacing Nav2. It builds a 2D costmap from the SLAM OccupancyGrid and plans paths using A*:</p>
+
+        <div class="math-block">
+          $$f(n) = g(n) + h(n), \quad h(n) = \|n - \text{goal}\|_2$$
+          <div class="math-label">Eq. 5 — A* heuristic (Euclidean distance)</div>
+        </div>
+
+        <div class="math-block">
+          $$C(n) = \begin{cases} 0 & d_{\text{wall}}(n) > r_{\text{soft}} \\ 10 & r_{\text{hard}} < d_{\text{wall}}(n) \leq r_{\text{soft}} \\ 80 & 0 < d_{\text{wall}}(n) \leq r_{\text{hard}} \\ 1000 & d_{\text{wall}}(n) = 0 \end{cases}$$
+          <div class="math-label">Eq. 6 — Costmap cell cost tiers ($r_{\text{hard}}=0.15m$, $r_{\text{soft}}=0.18m$)</div>
+        </div>
+
+        <p>A proportional controller drives the robot along pruned waypoints:</p>
+
+        <div class="math-block">
+          $$v = \text{clip}(K_P^{lin} \cdot d_{wp},\; V_{min},\; V_{max}), \quad \omega = \text{clip}(K_P^{ang} \cdot e_\psi,\; -\omega_{max},\; \omega_{max})$$
+          <div class="math-label">Eq. 7 — Proportional velocity controller ($K_P^{lin}=0.80$, $K_P^{ang}=0.40$, $V_{max}=0.35$ m/s)</div>
+        </div>
+
+        <!-- 2.4 Behavior Coordinator -->
+        <h3 id="algorithm-coord">2.4 Behavior Coordinator Node</h3>
+        <p>The coordinator implements a 6-state finite state machine managing the exploration lifecycle:</p>
+
+        <div class="math-block">
+          $$\mathcal{S} = \{\text{IDLE}, \text{SELECTING}, \text{PENDING}, \text{NAVIGATING}, \text{ARRIVED}, \text{DONE}\}$$
+          <div class="math-label">Eq. 8 — State space</div>
+        </div>
+
+        <div class="card">
+          <h4>State Transitions</h4>
+          <table class="bench-table">
+            <tr><th>From</th><th>To</th><th>Condition</th></tr>
+            <tr><td>SELECTING</td><td>PENDING</td><td>Frontier available, navigator server ready</td></tr>
+            <tr><td>PENDING</td><td>NAVIGATING</td><td>Goal accepted by action server</td></tr>
+            <tr><td>NAVIGATING</td><td>SELECTING</td><td>Goal succeeded or frontier consumed &gt; $r_{lock}=3.0m$</td></tr>
+            <tr><td>NAVIGATING</td><td>SELECTING</td><td>Goal failed, failure count &lt; $N_{max}=5$</td></tr>
+            <tr><td>NAVIGATING</td><td>DONE</td><td>Battery &lt; 15% or E-stop triggered</td></tr>
+            <tr><td>SELECTING</td><td>DONE</td><td>All frontiers visited/blacklisted</td></tr>
+          </table>
+        </div>
+
+        <p>Frontier stability is enforced via a proximity lock: if the robot is within $r_{lock} = 3.0$m of its current goal anchor, frontier updates are ignored — preventing oscillation between competing frontiers as the map updates.</p>
+
+      </section>
+
+      <!-- ── 3. Benchmarking & Results ── -->
+      <section id="results">
+        <h2>3. Benchmarking &amp; Results</h2>
+
+        <div class="status-banner">
+          <div class="status-icon">📊</div>
+          <div class="status-text">
+            <strong>Results from Real Hardware Testing</strong>
+            <span>TurtleBot4 Lite · ASU Lab Environment · May 2026</span>
+          </div>
+        </div>
+
+        <!-- 3.1 Trial Data -->
+        <h3 id="results-trials">3.1 Exploration Trial Data (10 Trials)</h3>
+
+        <table class="bench-table">
+          <thead>
+            <tr>
+              <th>Trial</th>
+              <th>Environment</th>
+              <th>Map Coverage (%)</th>
+              <th>Duration (s)</th>
+              <th>Frontiers Visited</th>
+              <th>E-stops</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>Lab corridor</td><td>~78%</td><td>—</td><td>—</td><td>0</td><td><span class="badge badge-yellow">Partial</span></td></tr>
+            <tr><td>2</td><td>Lab corridor</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-yellow">Pending</span></td></tr>
+            <tr><td>3</td><td>Lab corridor</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-yellow">Pending</span></td></tr>
+            <tr><td>4</td><td>Lab corridor</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-yellow">Pending</span></td></tr>
+            <tr><td>5</td><td>Lab corridor</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-yellow">Pending</span></td></tr>
+            <tr><td>6</td><td>Lab corridor</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-yellow">Pending</span></td></tr>
+            <tr><td>7</td><td>Lab corridor</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-yellow">Pending</span></td></tr>
+            <tr><td>8</td><td>Lab corridor</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-yellow">Pending</span></td></tr>
+            <tr><td>9</td><td>Lab corridor</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-yellow">Pending</span></td></tr>
+            <tr><td>10</td><td>Lab corridor</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-yellow">Pending</span></td></tr>
+          </tbody>
+        </table>
+
+        <div class="warn-box">
+          <strong>Note:</strong> Full 10-trial benchmarking is in progress. Data will be updated with empirical results from the final hardware demonstration. Trial 1 results are from preliminary testing — full coverage metrics will be added after the May 8 demo.
+        </div>
+
+        <!-- 3.2 Hazard Detection -->
+        <h3 id="results-hazmat">3.2 Hazard Detection Performance</h3>
+
+        <div class="card-grid">
+          <div class="card">
+            <h4>DeepHAZMAT Detection</h4>
+            <table class="bench-table">
+              <tr><th>Sign</th><th>Confidence</th><th>Distance</th></tr>
+              <tr><td>Explosive 1.1</td><td>92%</td><td>~0.5m</td></tr>
+              <tr><td>Radioactive I</td><td>99%</td><td>~0.5m</td></tr>
+              <tr><td>Flammable</td><td>~85%</td><td>~0.5m</td></tr>
+            </table>
+          </div>
+          <div class="card">
+            <h4>YOLOv5 Fire Detection</h4>
+            <table class="bench-table">
+              <tr><th>Source</th><th>Confidence</th><th>Notes</th></tr>
+              <tr><td>Phone screen</td><td>63%</td><td>Works reliably</td></tr>
+              <tr><td>Printed image</td><td>&lt;35%</td><td>Below threshold</td></tr>
+              <tr><td>Real flames</td><td>—</td><td>Not tested</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Hardware Hazard Detection (Create3 Sensors)</h4>
+          <p>The Create3 base publishes hardware hazards directly to <code>/hazard_detection</code>:</p>
+          <ul>
+            <li><strong>Cliff sensors (×4):</strong> IR downward-facing, triggers E-stop immediately. Tested on table edge — reliable at 2cm drop.</li>
+            <li><strong>Bump sensor:</strong> Detects physical contact. Published as <code>type=1</code> in HazardDetectionVector.</li>
+            <li><strong>Slip detection:</strong> Wheel encoder vs IMU comparison. Simulated via mock publisher in Gazebo.</li>
+          </ul>
+        </div>
+
+        <!-- 3.3 Mapping Coverage -->
+        <h3 id="results-mapping">3.3 Mapping &amp; Navigation Performance</h3>
+
+        <div class="card-grid-3">
+          <div class="card">
+            <h4>SLAM Performance</h4>
+            <ul>
+              <li>Map resolution: 0.05m/cell</li>
+              <li>Update rate: ~1 Hz</li>
+              <li>Toolbox: slam_toolbox (async)</li>
+              <li>Frame: map → odom → base_link</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>Navigation Parameters</h4>
+            <ul>
+              <li>Max speed: 0.35 m/s</li>
+              <li>Goal threshold: 0.35m</li>
+              <li>Align threshold: 0.20 rad</li>
+              <li>Snap search: 20 cells</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>Exploration Strategy</h4>
+            <ul>
+              <li>Scoring: Nearest-first (wavefront)</li>
+              <li>Proximity lock: 3.0m</li>
+              <li>Similarity radius: 0.50m</li>
+              <li>Max failures: 5 per frontier</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <strong>Known Simulation Limitation:</strong> In Gazebo Sim 8 with TurtleBot4, the RPLIDAR A1M8 uses Ogre1 rendering by default which causes all rays to return minimum range (0.164m) due to self-collision geometry. Fixed by changing <code>render_engine</code> from <code>ogre</code> to <code>ogre2</code> in <code>create3.urdf.xacro</code>. This is a known upstream bug (GitHub issue #676).
+        </div>
+      </section>
+
+      <!-- ── 4. Ethical Impact Statement ── -->
+      <section id="ethical">
+        <h2>4. Ethical Impact Statement</h2>
+
+        <p>Autonomous mobile robots operating in shared human environments raise important ethical considerations that must be addressed both in current implementation and future iterations of this system.</p>
+
+        <div class="ethical-grid">
+          <div class="ethical-card">
+            <div class="icon">🔒</div>
+            <h4>Privacy</h4>
+            <p>The OAK-D camera continuously captures RGB and depth imagery during exploration. In current lab testing this data is processed locally and not stored persistently. However, deployment in public or workplace environments would necessitate explicit consent protocols, automatic face/person blurring (via YOLO person detection with anonymization), and a data retention policy compliant with FERPA and relevant privacy regulations. The system currently logs all hazard detections to ROS bags — these logs must be treated as sensitive data if they contain identifiable imagery.</p>
+          </div>
+          <div class="ethical-card">
+            <div class="icon">⚡</div>
+            <h4>Safety</h4>
+            <p>The TurtleBot4 Lite weighs approximately 3.3kg and operates at up to 0.35 m/s, producing kinetic energy of ~0.2J — sufficient to cause discomfort on human contact. Our system implements a multi-layer safety architecture: hardware cliff sensors trigger immediate E-stop, the navigation planner inflates walls by 0.15-0.18m to maintain safe clearance, and the CRITICAL_HAZARDS set ({CLIFF, POTHOLE}) triggers exploration halt. Future iterations should add human detection via the depth camera to reduce speed or stop when people are within 1m, and implement a physical emergency stop accessible to bystanders.</p>
+          </div>
+          <div class="ethical-card">
+            <div class="icon">⚖️</div>
+            <h4>Bias &amp; Limitations</h4>
+            <p>The RPLIDAR A1M8 cannot detect glass walls, transparent barriers, or highly reflective surfaces — creating systematic blind spots. The DeepHAZMAT model was trained on standardized placard images and may underperform on damaged, faded, or non-standard HAZMAT signs used outside North America. The YOLOv5 fire model was trained on video fire imagery and shows reduced performance on printed/displayed representations. From a Justice perspective, deployment in under-resourced facilities may face sensor limitations (glass walls, poor lighting) not present in standard lab settings, creating unequal safety outcomes. From a Utilitarian perspective, the system's exploratory benefit in hazardous environments (search and rescue, industrial inspection) outweighs current limitations, provided the limitations are clearly communicated to operators.</p>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h4>Ethical Framework Application</h4>
+          <p><strong>Utilitarian:</strong> The system maximizes utility in scenarios where human entry would be dangerous (post-disaster search, industrial hazmat surveys). The expected benefit to rescuers and inspectors outweighs the risk of false negatives in hazard detection, provided humans remain in supervisory roles.</p>
+          <p><strong>Justice:</strong> Ensuring equitable safety outcomes requires the system to perform reliably across diverse environments, not only well-lit, obstacle-free lab corridors. Future work must include testing in varied conditions (low light, cluttered environments, outdoor settings) to identify and mitigate performance disparities.</p>
+          <p><strong>Virtue Ethics:</strong> Engineers deploying this system bear responsibility for honest communication of its limitations to end users, regular revalidation as deployment contexts evolve, and ensuring meaningful human oversight is maintained throughout autonomous operation.</p>
+        </div>
+      </section>
+
+      <!-- ── 5. Code Links ── -->
+      <section id="code-links">
+        <h2>5. Custom Module Code Links</h2>
+        <p>All custom ROS 2 nodes are authored by the team and available in the GitHub repository:</p>
+
+        <div class="code-link-grid">
+          <div class="code-link-card">
+            <div class="file">frontier_explorer_node.py</div>
+            <div class="desc">Frontier detection, clustering, nearest-first scoring</div>
+            <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/frontier_explorer_node.py" target="_blank">→ View on GitHub</a>
+            <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/frontier_explorer_node.py#L94" target="_blank">→ Line 94: Wavefront scoring</a>
+          </div>
+          <div class="code-link-card">
+            <div class="file">navigation_planner.py</div>
+            <div class="desc">Costmap, A* planner, swept-corridor path pruning, P-controller</div>
+            <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/navigation_planner.py" target="_blank">→ View on GitHub</a>
+            <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/navigation_planner.py#L88" target="_blank">→ Line 88: Costmap builder</a>
+          </div>
+          <div class="code-link-card">
+            <div class="file">semantic_hazard_classifier_node.py</div>
+            <div class="desc">5-layer hazard detection: hardware, YOLOv5, HSV, depth, DeepHAZMAT</div>
+            <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/semantic_hazard_classifier_node.py" target="_blank">→ View on GitHub</a>
+          </div>
+          <div class="code-link-card">
+            <div class="file">behavior_coordinator_node.py</div>
+            <div class="desc">6-state FSM, proximity lock, frontier stability, E-stop logic</div>
+            <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/behavior_coordinator_node.py" target="_blank">→ View on GitHub</a>
+          </div>
+          <div class="code-link-card">
+            <div class="file">scan_relay_node.py</div>
+            <div class="desc">Simulation frame_id fix for SLAM toolbox compatibility</div>
+            <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/scan_relay_node.py" target="_blank">→ View on GitHub</a>
+          </div>
+          <div class="code-link-card">
+            <div class="file">exploration.launch.py</div>
+            <div class="desc">Unified launch: SLAM + all nodes + RViz2, sim/robot flag</div>
+            <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/launch/exploration.launch.py" target="_blank">→ View on GitHub</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 6. Individual Contributions ── -->
+      <section id="contributions">
+        <h2>6. Individual Contribution &amp; Audit Appendix</h2>
+
+        <table class="contrib-table">
+          <thead>
+            <tr>
+              <th>Team Member</th>
+              <th>Primary Role</th>
+              <th>Key Contributions</th>
+              <th>File Authorship</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Princess Colon</strong><br/><small>pcolon@asu.edu</small></td>
+              <td>Navigation &amp; Frontier Planning</td>
+              <td>
+                <ul style="padding-left:16px;font-size:13px;">
+                  <li>Custom A* navigation planner replacing Nav2</li>
+                  <li>Frontier explorer with wavefront scoring</li>
+                  <li>Costmap builder with wall inflation</li>
+                  <li>Swept-corridor path pruning</li>
+                  <li>Real hardware integration &amp; testing</li>
+                </ul>
+              </td>
+              <td>
+                <code style="font-size:12px;">frontier_explorer_node.py</code><br/>
+                <code style="font-size:12px;">navigation_planner.py</code>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Manjunath Kondamu</strong><br/><small>mkondamu@asu.edu</small></td>
+              <td>Perception &amp; Hazard Detection</td>
+              <td>
+                <ul style="padding-left:16px;font-size:13px;">
+                  <li>5-layer semantic hazard classifier</li>
+                  <li>DeepHAZMAT integration with per-class danger ratings</li>
+                  <li>YOLOv5 fire detection (fire_best.pt)</li>
+                  <li>Behavior coordinator FSM</li>
+                  <li>RViz2 hazard marker visualization</li>
+                  <li>Simulation debugging (Ogre2 fix, scan relay)</li>
+                </ul>
+              </td>
+              <td>
+                <code style="font-size:12px;">semantic_hazard_classifier_node.py</code><br/>
+                <code style="font-size:12px;">behavior_coordinator_node.py</code><br/>
+                <code style="font-size:12px;">scan_relay_node.py</code>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Rohit Mane</strong><br/><small>rmane2@asu.edu</small></td>
+              <td>System Integration &amp; Documentation</td>
+              <td>
+                <ul style="padding-left:16px;font-size:13px;">
+                  <li>Launch file architecture</li>
+                  <li>Website documentation (M1–M3)</li>
+                  <li>Hardware setup &amp; configuration</li>
+                  <li>Mathematical documentation</li>
+                </ul>
+              </td>
+              <td>
+                <code style="font-size:12px;">exploration.launch.py</code><br/>
+                <code style="font-size:12px;">milestone1-3.html</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="evidence" style="margin-top:20px;">
+          <strong>Git Repository:</strong> All commits are traceable to individual authors at
+          <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank">github.com/PriColon/mobile-robotics-frontier-exploration</a>.
+          Branch <code>main</code> contains all final code. Author attribution follows from git log.
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ── Footer ── -->
+<footer style="background:#6B1530;padding:32px 40px;text-align:center;color:rgba(255,255,255,0.6);font-size:13px;">
+  <div style="font-family:'Playfair Display',serif;font-size:1rem;color:white;margin-bottom:6px;">Autonomous Frontier Exploration with Semantic Hazard Mapping</div>
+  <div>RAS 598 Mobile Robotics · ASU Spring 2026 · Group 1</div>
+  <div style="margin-top:16px;display:flex;justify-content:center;gap:24px;flex-wrap:wrap;">
+    <a href="../index.html" style="color:rgba(255,198,39,0.7);text-decoration:none;">Home</a>
+    <a href="milestone1.html" style="color:rgba(255,198,39,0.7);text-decoration:none;">Milestone 1</a>
+    <a href="milestone2.html" style="color:rgba(255,198,39,0.7);text-decoration:none;">Milestone 2</a>
+    <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank" style="color:rgba(255,198,39,0.7);text-decoration:none;">GitHub</a>
+  </div>
+</footer>
+
+</body>
+</html>

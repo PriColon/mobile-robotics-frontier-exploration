@@ -13,7 +13,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/exploration.launch.py']),
-        ('share/' + package_name + '/net', glob('net/*')),
+        ('share/' + package_name, ['slam_sim.yaml']),
+        ('share/' + package_name + '/net', ['net/yolo.cfg', 'net/yolo.weights', 'net/labels.names', 'net/fire_best.pt']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -27,6 +28,9 @@ setup(
             'frontier_explorer_node = frontier_exploration_mapping.frontier_explorer_node:main',
             'semantic_hazard_classifier_node = frontier_exploration_mapping.semantic_hazard_classifier_node:main',
             'behavior_coordinator_node = frontier_exploration_mapping.behavior_coordinator_node:main',
+            'navigation_planner_node = frontier_exploration_mapping.navigation_planner:main',
+            'scan_relay_node = frontier_exploration_mapping.scan_relay_node:main',
+
         ],
     },
 )
