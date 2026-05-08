@@ -82,7 +82,28 @@ class BehaviorCoordinator(Node):
         self.create_timer(0.5, self._loop,     callback_group=self._cb_group)
         self.create_timer(1.0, self._watchdog, callback_group=self._cb_group)
 
+        # Bootstrap: publish cmd_vel to spin robot until first frontiers appear
+        self._bootstrap_done = False
+        self._cmd_vel_pub = self.create_publisher(
+            __import__('geometry_msgs.msg', fromlist=['TwistStamped']).TwistStamped,
+            '/cmd_vel', 10)
+        self.create_timer(0.1, self._bootstrap_spin, callback_group=self._cb_group)
+
         self.get_logger().info('BehaviorCoordinator started — waiting for frontiers...')
+
+    def _bootstrap_spin(self):
+        """Spin robot in place until first frontiers are detected."""
+        if self._bootstrap_done:
+            return
+        if self.frontier_goals:
+            self._bootstrap_done = True
+            self.get_logger().info('Frontiers found — bootstrap complete.')
+            return
+        from geometry_msgs.msg import TwistStamped
+        msg = TwistStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.twist.angular.z = 0.5
+        self._cmd_vel_pub.publish(msg)
 
     def _tf_pose_timer(self):
         try:
