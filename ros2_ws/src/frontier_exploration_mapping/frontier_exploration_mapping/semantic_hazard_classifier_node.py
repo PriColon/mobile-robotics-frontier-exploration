@@ -1,373 +1,381 @@
 #!/usr/bin/env python3
 """
-Semantic Hazard Classifier Node  (YOLO-only, throttled + CPU-friendly)
+Semantic Hazard Classifier Node
 
-Key design points:
-  - YOLO runs at most once every YOLO_INTERVAL_SEC (default 1.0 s) to stay
-    CPU-friendly.  At 0.2 m/s the robot travels only 0.2 m between inferences.
-  - After every inference the result is published IMMEDIATELY on the YOLO thread
-    via a direct call to _do_publish(), bypassing the 5 Hz timer.  This means
-    detections appear (and disappear) within one inference cycle of the scene change
-    rather than waiting up to YOLO_INTERVAL_SEC for the timer to fire.
-  - _last_detections is CLEARED at the start of each inference cycle so that a
-    stale positive can never outlive its own YOLO run.
-  - The 5 Hz timer now acts only as a heartbeat keepalive — it re-publishes the
-    current (possibly empty) state so RViz2 markers don't time out between inferences.
-  - All heavy work stays on the YOLO thread; the main executor handles only
-    lightweight timer callbacks and Create3 hardware events.
+Architecture
+────────────
+  Camera → image callback (YOLO thread) → _pending_frame + capture timestamp
+  YOLO thread (throttled): decode → resize → infer → publish alert immediately
+  Localization thread: for each detection, look up tf at capture time → place
+                       a map-frame marker at the estimated HAZMAT location
 
-Data flow:
-  camera topic → image callbacks (YOLO thread) → _pending_frame
-  YOLO thread: cooldown elapsed → decode → resize → infer → _do_publish() [immediate]
-  main executor: 5 Hz heartbeat timer → _do_publish() [keepalive only]
+Retroactive localization
+────────────────────────
+  The OAK-D stamps each frame at hardware capture time (msg.header.stamp).
+  When YOLO finds a detection, we record that stamp and push a job onto a
+  small queue.  A separate localization thread then calls tf2's
+  lookup_transform(target_frame='map', source_frame='base_link',
+  time=capture_stamp) — asking "where was the robot when this photo was
+  taken?"  tf2 buffers ~10 s of history, so as long as YOLO finishes within
+  that window (it takes ~160 ms) the lookup always succeeds.
+
+  The result is a persistent MarkerArray on /hazmat_map_markers that
+  accumulates every confirmed HAZMAT location in the map frame.  This is
+  separate from the transient /hazmat_markers which just shows the current
+  frame's detection status.
+
+Topics published
+────────────────
+  /hazard_alert        std_msgs/String      "HAZMAT" | "CLEAR"  (per inference)
+  /hazard_markers      MarkerArray          transient detection cylinder
+  /hazmat_map_markers  MarkerArray          persistent map-frame HAZMAT pins
+  /exploration/stop    std_msgs/Bool        True on critical hazard
 """
 
 import time
 import threading
 import traceback
 import os
-
+import queue
+import math
 import rclpy
-import rclpy.executors
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+from rclpy.action import ActionClient
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 
-import numpy as np
-import cv2
+from geometry_msgs.msg import PoseArray
+from sensor_msgs.msg import BatteryState
+from std_msgs.msg import Bool
+from nav2_msgs.action import NavigateToPose
 
-from cv_bridge import CvBridge
-from ament_index_python.packages import get_package_share_directory
-
-from sensor_msgs.msg import CompressedImage, Image
-from std_msgs.msg import Bool, String
-from visualization_msgs.msg import Marker, MarkerArray
+import tf2_ros
+from tf2_ros import TransformException
 
 try:
-    from irobot_create_msgs.msg import HazardDetectionVector, SlipStatus
-    CREATE3_AVAILABLE = True
+    from irobot_create_msgs.msg import HazardDetectionVector, HazardDetection
+    HAZARD_AVAILABLE = True
 except ImportError:
-    CREATE3_AVAILABLE = False
-
-HAZMAT_AVAILABLE = False
-_hazmat_import_error = None
-try:
-    from frontier_exploration_mapping.deep_hazmat import DeepHAZMAT
-    HAZMAT_AVAILABLE = True
-except Exception:
-    _hazmat_import_error = traceback.format_exc()
+    HAZARD_AVAILABLE = False
 
 
-# ---------------------------------------------------------------------------
-# Tunable constants
-# ---------------------------------------------------------------------------
+FRONTIER_TIMEOUT           = 5.0
+BATTERY_LOW_PCT            = 15.0
+MAX_GOAL_FAILURES          = 3
 
-# How often YOLO is allowed to run.
-# At 0.2 m/s the robot travels 0.2 m in 1 s — scene barely changes.
-# Results are published immediately after each run so lowering this only
-# increases CPU load without improving responsiveness.
-YOLO_INTERVAL_SEC = 1.0
-
-# How long the YOLO worker sleeps between loop iterations when it has nothing to do.
-# 0.1 s = 10 Hz polling — cheap, keeps latency low.
-WORKER_IDLE_SLEEP_SEC = 0.1
-
-# JPEG quality for raw→compressed conversion (lower = faster, still fine for YOLO).
-JPEG_QUALITY = 75
+PROXIMITY_LOCK_RADIUS      = 1.0
+FRONTIER_SIMILARITY_RADIUS = 0.50
 
 
-class SemanticHazardClassifier(Node):
+class State:
+    IDLE       = 'IDLE'
+    SELECTING  = 'SELECTING'
+    PENDING    = 'PENDING'
+    NAVIGATING = 'NAVIGATING'
+    ARRIVED    = 'ARRIVED'
+    DONE       = 'DONE'
+
+
+class BehaviorCoordinator(Node):
 
     def __init__(self):
-        super().__init__('semantic_hazard_classifier')
+        super().__init__('behavior_coordinator')
 
-        self.declare_parameter('hazmat_confidence', 0.5)
-        self.declare_parameter('yolo_width', 320)
-        self.declare_parameter('yolo_interval_sec', YOLO_INTERVAL_SEC)
+        self._cb_group = ReentrantCallbackGroup()
 
-        hazmat_confidence  = self.get_parameter('hazmat_confidence').value
-        self._yolo_width   = self.get_parameter('yolo_width').value
-        self._yolo_interval = self.get_parameter('yolo_interval_sec').value
+        self.state            = State.SELECTING
+        self.frontier_goals   = []
+        self.visited_set      = set()
+        self.failure_counts   = {}
+        self.original_goal_xy = None
+        self.current_goal_xy  = None
+        self.last_frontier_t  = None
+        self.nav_goal_handle  = None
+        self.robot_pose       = None
 
-        self.bridge = CvBridge()
+        self._tf_buffer   = tf2_ros.Buffer()
+        self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
+        self.create_timer(0.05, self._tf_pose_timer, callback_group=self._cb_group)
 
-        # ── Shared state ─────────────────────────────────────────────────
-        # _pending_frame: latest raw JPEG bytes from the camera callback.
-        #   Written by image callbacks (YOLO thread).
-        #   Read+cleared by YOLO inference (YOLO thread).
-        #   Both sides are on the SAME thread → no lock needed here.
-        self._pending_frame: bytes | None = None
+        self.create_subscription(
+            PoseArray,    '/frontier_goals',   self._frontiers_cb, 10,
+            callback_group=self._cb_group)
+        self.create_subscription(
+            BatteryState, '/battery_state',    self._battery_cb,   10,
+            callback_group=self._cb_group)
+        self.create_subscription(
+            Bool,         '/exploration/stop', self._kill_cb,      10,
+            callback_group=self._cb_group)
 
-        # _last_detections: result of the last successful inference.
-        #   Written by YOLO thread, read by publish timer (main thread) → needs lock.
-        self._result_lock     = threading.Lock()
-        self._last_detections = []
-
-        # Timestamp of the last YOLO run (monotonic, YOLO thread only).
-        self._last_yolo_time = 0.0
-
-        # ── DeepHAZMAT ────────────────────────────────────────────────────
-        self._hazmat = None
-        if HAZMAT_AVAILABLE:
-            try:
-                pkg_share = get_package_share_directory('frontier_exploration_mapping')
-                net_dir   = os.path.join(pkg_share, 'net')
-                for fname in ('yolo.cfg', 'yolo.weights', 'labels.names'):
-                    fpath = os.path.join(net_dir, fname)
-                    if not os.path.exists(fpath):
-                        raise FileNotFoundError(f'Missing YOLO file: {fpath}')
-                self._hazmat = DeepHAZMAT(
-                    k=0,
-                    net_directory=net_dir,
-                    min_confidence=hazmat_confidence,
-                    nms_threshold=0.3,
-                    segmentation_enabled=False,
-                )
-                self.get_logger().info(
-                    f'DeepHAZMAT loaded '
-                    f'(yolo_width={self._yolo_width}, '
-                    f'interval={self._yolo_interval:.1f}s).')
-            except Exception as e:
-                self.get_logger().error(
-                    f'DeepHAZMAT failed to load: {e}\n{traceback.format_exc()}')
-        else:
-            self.get_logger().error(
-                f'DeepHAZMAT import failed:\n{_hazmat_import_error}')
-
-        # ── Image helper node (lives entirely on the YOLO thread) ─────────
-        # This node has NO publishers and is never added to the main executor.
-        # The main rclpy.spin() will never touch it.
-        sensor_qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            durability=DurabilityPolicy.VOLATILE,
-            depth=1,          # depth=1: only keep the newest frame, drop the rest
-        )
-
-        self._image_node = rclpy.create_node('hazmat_image_helper')
-        self._image_node.create_subscription(
-            CompressedImage,
-            '/oakd/rgb/preview/image_raw/compressed',
-            self._compressed_cb,
-            sensor_qos,
-        )
-        self._image_node.create_subscription(
-            Image,
-            '/oakd/rgb/preview/image_raw',
-            self._raw_cb,
-            sensor_qos,
-        )
-
-        self._image_executor = rclpy.executors.SingleThreadedExecutor()
-        self._image_executor.add_node(self._image_node)
-
-        # ── YOLO background thread ────────────────────────────────────────
-        self._yolo_thread = threading.Thread(target=self._yolo_worker, daemon=True)
-        self._yolo_thread.start()
-
-        # ── Main-node subscribers (no images) ─────────────────────────────
-        if CREATE3_AVAILABLE:
+        if HAZARD_AVAILABLE:
             self.create_subscription(
-                HazardDetectionVector, '/hazard_detection',
-                self._hw_hazard_cb, 10)
-            self.create_subscription(
-                SlipStatus, '/slip_status',
-                self._slip_cb, 10)
+                HazardDetectionVector, '/hazard_detection', self._hazard_cb, 10,
+                callback_group=self._cb_group)
 
-        # ── Publishers ────────────────────────────────────────────────────
-        self.alert_pub  = self.create_publisher(String,      '/hazard_alert',     10)
-        self.stop_pub   = self.create_publisher(Bool,        '/exploration/stop',  10)
-        self.marker_pub = self.create_publisher(MarkerArray, '/hazard_markers',    10)
+        self._nav_client = ActionClient(
+            self, NavigateToPose, '/navigate_to_pose',
+            callback_group=self._cb_group)
 
-        # 5 Hz heartbeat — re-publishes current state so RViz2 markers don't time out.
-        # The real publish happens immediately after each YOLO inference on the YOLO thread.
-        self.create_timer(0.2, self._publish_results)
+        self.create_timer(0.5, self._loop,     callback_group=self._cb_group)
+        self.create_timer(1.0, self._watchdog, callback_group=self._cb_group)
 
-        self.get_logger().info(
-            f'Semantic Hazard Classifier started. '
-            f'YOLO will run at most every {self._yolo_interval:.1f} s.')
+        # Bootstrap: publish cmd_vel to spin robot until first frontiers appear
+        self._bootstrap_done = False
+        self._cmd_vel_pub = self.create_publisher(
+            __import__('geometry_msgs.msg', fromlist=['TwistStamped']).TwistStamped,
+            '/cmd_vel', 10)
+        self.create_timer(0.1, self._bootstrap_spin, callback_group=self._cb_group)
 
-    # ── Image callbacks — called on YOLO thread by _image_executor ────────
-    # These only store the latest JPEG bytes; they do NOT decode or run YOLO.
-    # Storing raw bytes is a fast memcopy — essentially free.
+        self.get_logger().info('BehaviorCoordinator started — waiting for frontiers...')
 
-    def _compressed_cb(self, msg: CompressedImage):
-        # Overwrite whatever was pending — we only ever need the newest frame.
-        self._pending_frame = bytes(msg.data)
+    def _bootstrap_spin(self):
+        """Spin robot in place until first frontiers are detected."""
+        if self._bootstrap_done:
+            return
+        if self.frontier_goals:
+            self._bootstrap_done = True
+            self.get_logger().info('Frontiers found — bootstrap complete.')
+            return
+        from geometry_msgs.msg import TwistStamped
+        msg = TwistStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.twist.angular.z = 0.5
+        self._cmd_vel_pub.publish(msg)
 
-    def _raw_cb(self, msg: Image):
-        # Raw Image: encode to JPEG on this thread so downstream handling is uniform.
+    def _tf_pose_timer(self):
         try:
-            frame = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
-            ok, buf = cv2.imencode(
-                '.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
-            if ok:
-                self._pending_frame = buf.tobytes()
-        except Exception as e:
-            print(f'[image helper] raw decode error: {e}')
+            tf = self._tf_buffer.lookup_transform(
+                'map', 'base_link',
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.05))
+        except TransformException:
+            return
+        self.robot_pose = (tf.transform.translation.x, tf.transform.translation.y)
 
-    def _hw_hazard_cb(self, msg):
-        from irobot_create_msgs.msg import HazardDetection
-        for det in msg.detections:
-            if det.type in (HazardDetection.CLIFF,):
-                stop = Bool()
-                stop.data = True
-                self.stop_pub.publish(stop)
-                self.get_logger().warn(f'CLIFF detected — E-STOP triggered')
-                return
+    def _loop(self):
+        if self.state == State.DONE:
+            return
+        if self.state in (State.IDLE, State.SELECTING, State.ARRIVED):
+            self._try_select_and_send()
 
-    def _slip_cb(self, msg):
-        pass   # placeholder for slip detection
+    def _find_similar_frontier(self, anchor_xy, radius):
+        ax, ay = anchor_xy
+        best, best_d = None, float('inf')
+        for x, y in self.frontier_goals:
+            if self._round_key(x, y) in self.visited_set:
+                continue
+            d = math.hypot(x - ax, y - ay)
+            if d <= radius and d < best_d:
+                best, best_d = (x, y), d
+        return best
 
-    # ── YOLO worker ────────────────────────────────────────────────────────
-    #
-    # Loop structure:
-    #   1. spin_once — drives image callbacks to fill _pending_frame (fast, non-blocking)
-    #   2. Check cooldown — if not enough time has passed, sleep and continue
-    #   3. Grab frame — if nothing new arrived, sleep and continue
-    #   4. CLEAR _last_detections immediately — stale result is gone from this point
-    #   5. Decode + resize + infer
-    #   6. Store result and publish IMMEDIATELY (don't wait for the 5 Hz timer)
-    #   7. Sleep WORKER_IDLE_SLEEP_SEC before next iteration
+    def _dist_to_anchor(self):
+        if self.robot_pose is None or self.original_goal_xy is None:
+            return None
+        rx, ry = self.robot_pose
+        gx, gy = self.original_goal_xy
+        return math.hypot(gx - rx, gy - ry)
 
-    def _yolo_worker(self):
-        try:
-            from imutils import resize as imutils_resize
-        except ImportError:
-            print('[YOLO worker] imutils not installed — exiting thread.')
+    def _try_select_and_send(self):
+        if self.state in (State.PENDING, State.NAVIGATING):
+            return
+        if not self.frontier_goals:
             return
 
-        self.get_logger().info('[YOLO worker] thread started.')
+        chosen = None
+        for x, y in self.frontier_goals:
+            if self._round_key(x, y) not in self.visited_set:
+                chosen = (x, y)
+                break
 
-        while rclpy.ok():
-            # ── Step 1: drain the image subscriber queue (fast) ──────────
-            self._image_executor.spin_once(timeout_sec=0.0)
+        if chosen is None:
+            self.get_logger().info('All known frontiers visited — exploration DONE.')
+            self.state = State.DONE
+            return
 
-            # ── Step 2: cooldown check ────────────────────────────────────
-            now = time.monotonic()
-            if now - self._last_yolo_time < self._yolo_interval:
-                time.sleep(WORKER_IDLE_SLEEP_SEC)
-                continue
+        self.original_goal_xy = chosen
+        self.current_goal_xy  = chosen
+        self._send_nav_goal(*chosen)
 
-            # ── Step 3: grab the latest frame ────────────────────────────
-            data = self._pending_frame
-            if data is None or self._hazmat is None:
-                time.sleep(WORKER_IDLE_SLEEP_SEC)
-                continue
-            self._pending_frame = None  # consume
+    def _send_nav_goal(self, gx: float, gy: float):
+        if not self._nav_client.wait_for_server(timeout_sec=3.0):
+            self.get_logger().warn('Navigator not available — staying in SELECTING.')
+            return
 
-            # ── Step 4: CLEAR stale result immediately ────────────────────
-            # From this moment forward, _last_detections reflects THIS inference
-            # cycle.  Any result from a previous cycle is gone — it will not be
-            # re-broadcast by the heartbeat timer while we're inferring.
-            with self._result_lock:
-                self._last_detections = []
+        goal_msg = NavigateToPose.Goal()
+        goal_msg.pose.header.frame_id    = 'map'
+        goal_msg.pose.header.stamp       = self.get_clock().now().to_msg()
+        goal_msg.pose.pose.position.x    = gx
+        goal_msg.pose.pose.position.y    = gy
+        goal_msg.pose.pose.orientation.w = 1.0
 
-            # ── Step 5: decode → resize → infer ──────────────────────────
-            arr   = np.frombuffer(data, dtype=np.uint8)
-            frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            if frame is None:
-                time.sleep(WORKER_IDLE_SLEEP_SEC)
-                continue
+        self.get_logger().info(
+            f'[{self.state}] → PENDING  '
+            f'anchor=({self.original_goal_xy[0]:.2f},{self.original_goal_xy[1]:.2f})  '
+            f'nav_goal=({gx:.2f},{gy:.2f})')
 
-            small = imutils_resize(frame, width=self._yolo_width)
+        self.state = State.PENDING
 
-            try:
-                t0         = time.monotonic()
-                results    = self._hazmat.update(small)
-                elapsed_ms = (time.monotonic() - t0) * 1000
-                detections = list(results) if results else []
-                self.get_logger().info(
-                    f'[YOLO worker] inference took {elapsed_ms:.0f} ms, '
-                    f'{len(detections)} detection(s).')
-            except Exception as e:
-                detections = []
-                print(f'[YOLO worker] inference error: {e}')
+        future = self._nav_client.send_goal_async(
+            goal_msg, feedback_callback=self._feedback_cb)
+        future.add_done_callback(self._goal_accepted_cb)
 
-            # ── Step 6: store result and publish IMMEDIATELY ──────────────
-            # Don't wait for the 5 Hz timer — publish the new result right now
-            # so detections appear (and disappear) within one inference cycle.
-            with self._result_lock:
-                self._last_detections = detections
-            self._do_publish()
+    def _goal_accepted_cb(self, future):
+        handle = future.result()
+        if not handle.accepted:
+            self.get_logger().warn('Goal rejected — back to SELECTING.')
+            self.state = State.SELECTING
+            return
 
-            self._last_yolo_time = time.monotonic()
+        self.get_logger().info(
+            f'Goal accepted — NAVIGATING to '
+            f'({self.current_goal_xy[0]:.2f},{self.current_goal_xy[1]:.2f})')
+        self.state = State.NAVIGATING
+        self.nav_goal_handle = handle
+        handle.get_result_async().add_done_callback(self._result_cb)
 
-            # ── Step 7: yield CPU before next iteration ───────────────────
-            time.sleep(WORKER_IDLE_SLEEP_SEC)
+    def _feedback_cb(self, feedback_msg):
+        self.get_logger().debug(
+            f'Distance remaining: {feedback_msg.feedback.distance_remaining:.2f} m')
 
-    # ── Shared publish logic (called from both YOLO thread and heartbeat timer) ──
+    def _result_cb(self, future):
+        from action_msgs.msg import GoalStatus
+        status = future.result().status
 
-    def _do_publish(self):
-        with self._result_lock:
-            detections = list(self._last_detections)
+        if status == GoalStatus.STATUS_SUCCEEDED:
+            key = self._round_key(*self.original_goal_xy)
+            self.get_logger().info(
+                f'Arrived at anchor ({self.original_goal_xy[0]:.2f},'
+                f'{self.original_goal_xy[1]:.2f})')
+            self.visited_set.add(key)
+            self.failure_counts.pop(key, None)
+            self.state = State.SELECTING
 
-        stamp = self.get_clock().now().to_msg()
-        ma    = MarkerArray()
-
-        if detections:
-            for det in detections:
-                self.get_logger().info(
-                    f'HAZMAT detected: {det}',
-                    throttle_duration_sec=1.0)
-
-            alert      = String()
-            alert.data = 'HAZMAT'
-            self.alert_pub.publish(alert)
-
-            m                    = Marker()
-            m.header.frame_id    = 'base_link'
-            m.header.stamp       = stamp
-            m.ns                 = 'hazmat'
-            m.id                 = 0
-            m.type               = Marker.CYLINDER
-            m.action             = Marker.ADD
-            m.pose.position.z    = 0.5
-            m.pose.orientation.w = 1.0
-            m.scale.x = m.scale.y = 0.3
-            m.scale.z            = 1.0
-            m.color.r            = 1.0
-            m.color.g            = 0.0
-            m.color.b            = 1.0
-            m.color.a            = 0.85
-            m.lifetime.sec       = 2
-            ma.markers.append(m)
+        elif status == GoalStatus.STATUS_CANCELED:
+            self.get_logger().info('Goal cancelled.')
+            self.state = State.SELECTING
 
         else:
-            alert      = String()
-            alert.data = 'CLEAR'
-            self.alert_pub.publish(alert)
+            key = self._round_key(*self.original_goal_xy)
+            self.failure_counts[key] = self.failure_counts.get(key, 0) + 1
+            count = self.failure_counts[key]
+            self.get_logger().warn(
+                f'Goal failed (status={status}) — '
+                f'failure {count}/{MAX_GOAL_FAILURES} for anchor {key}')
+            if count >= MAX_GOAL_FAILURES:
+                self.get_logger().warn(f'Blacklisting anchor {key}.')
+                self.visited_set.add(key)
+                self.failure_counts.pop(key, None)
+            self.state = State.SELECTING
 
-            clear        = Marker()
-            clear.action = Marker.DELETEALL
-            ma.markers.append(clear)
+    def _frontiers_cb(self, msg: PoseArray):
+        self.last_frontier_t = self.get_clock().now()
+        self.frontier_goals  = [(p.position.x, p.position.y) for p in msg.poses]
 
-        self.marker_pub.publish(ma)
+        if self.state not in (State.NAVIGATING, State.PENDING):
+            if self.state in (State.IDLE, State.SELECTING):
+                self._try_select_and_send()
+            return
 
-    # ── Heartbeat timer — main executor, keeps RViz2 markers alive ─────────
+        if self.state == State.PENDING:
+            return
 
-    def _publish_results(self):
-        # Just re-publish whatever the YOLO thread last stored.
-        # The real "new result" publish already happened on the YOLO thread.
-        self._do_publish()
+        if self.original_goal_xy is None:
+            return
 
-    def destroy_node(self):
-        self._image_executor.shutdown()
-        self._image_node.destroy_node()
-        super().destroy_node()
+        active_key   = self._round_key(*self.current_goal_xy)
+        current_keys = {self._round_key(x, y) for x, y in self.frontier_goals}
+
+        if active_key in current_keys:
+            return
+
+        similar = self._find_similar_frontier(
+            self.original_goal_xy, FRONTIER_SIMILARITY_RADIUS)
+
+        if similar is not None:
+            old = self.current_goal_xy
+            self.current_goal_xy = similar
+            self.get_logger().info(
+                f'Frontier drifted: ({old[0]:.2f},{old[1]:.2f}) → '
+                f'({similar[0]:.2f},{similar[1]:.2f})  '
+                f'anchor=({self.original_goal_xy[0]:.2f},{self.original_goal_xy[1]:.2f}) '
+                f'— continuing.')
+            return
+
+        dist = self._dist_to_anchor()
+        dist_str = f'{dist:.2f} m' if dist is not None else 'unknown'
+
+        if dist is not None and dist <= PROXIMITY_LOCK_RADIUS:
+            self.get_logger().info(
+                f'Frontier consumed, robot {dist_str} from anchor '
+                f'(<= {PROXIMITY_LOCK_RADIUS} m) — holding course.')
+        else:
+            self.get_logger().info(
+                f'Frontier consumed, robot {dist_str} from anchor '
+                f'— cancelling and reselecting.')
+            anchor_key = self._round_key(*self.original_goal_xy)
+            self.visited_set.add(anchor_key)
+            self.failure_counts.pop(anchor_key, None)
+            self._cancel_active_goal()
+            self.state = State.SELECTING
+            self._try_select_and_send()
+
+    def _battery_cb(self, msg: BatteryState):
+        pct = msg.percentage * 100.0
+        if pct < BATTERY_LOW_PCT:
+            self.get_logger().warn(f'Battery low ({pct:.1f}%) — stopping.')
+            self._emergency_stop()
+
+    def _hazard_cb(self, msg):
+        if not HAZARD_AVAILABLE:
+            return
+        for det in msg.detections:
+            if det.type in (HazardDetection.BUMP, HazardDetection.CLIFF):
+                self.get_logger().warn('Hazard — cancelling active goal.')
+                self._cancel_active_goal()
+                self.state = State.SELECTING
+                return
+
+    def _kill_cb(self, msg: Bool):
+        if msg.data:
+            self.get_logger().warn('/exploration/stop — shutting down.')
+            self._emergency_stop()
+
+    def _watchdog(self):
+        if self.last_frontier_t is None or self.state == State.DONE:
+            return
+        elapsed = (self.get_clock().now() - self.last_frontier_t).nanoseconds * 1e-9
+        if elapsed > FRONTIER_TIMEOUT and self.state == State.NAVIGATING:
+            self.get_logger().warn(
+                f'No frontier update for {elapsed:.1f} s — reverting to IDLE.')
+            self.state = State.IDLE
+
+    def _cancel_active_goal(self):
+        if self.nav_goal_handle is not None:
+            self.nav_goal_handle.cancel_goal_async()
+            self.nav_goal_handle = None
+
+    def _emergency_stop(self):
+        self._cancel_active_goal()
+        self.state = State.DONE
+
+    @staticmethod
+    def _round_key(x, y, precision=1):
+        return (round(x, precision), round(y, precision))
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = SemanticHazardClassifier()
+    node = BehaviorCoordinator()
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
         node.destroy_node()
-        try:
-            rclpy.shutdown()
-        except Exception:
-            pass
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
