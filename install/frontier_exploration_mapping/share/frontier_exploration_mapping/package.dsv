@@ -1,6 +1,0 @@
-source;share/frontier_exploration_mapping/hook/pythonpath.ps1
-source;share/frontier_exploration_mapping/hook/pythonpath.dsv
-source;share/frontier_exploration_mapping/hook/pythonpath.sh
-source;share/frontier_exploration_mapping/hook/ament_prefix_path.ps1
-source;share/frontier_exploration_mapping/hook/ament_prefix_path.dsv
-source;share/frontier_exploration_mapping/hook/ament_prefix_path.sh
