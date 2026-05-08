@@ -4,548 +4,602 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Autonomous Frontier Exploration — RAS 598 · ASU</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Source+Sans+3:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
-:root{--maroon:#8C1D40;--maroon-dark:#6B1530;--maroon-light:#B5244E;--gold:#FFC627;--gold-dark:#E0A800;--gold-light:#FFD966;--white:#FFFFFF;--off-white:#FAFAF8;--gray-50:#F7F6F3;--gray-100:#EDEBE5;--gray-200:#D5D2C8;--gray-400:#9A9488;--gray-600:#5C5750;--gray-800:#2E2B26;--text:#1A1814;--text-muted:#6B6560;--border:#E0DDD5;--shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.04);--shadow-lg:0 8px 32px rgba(0,0,0,0.10);}
+:root{
+  --maroon:#8C1D40;--maroon-dark:#6B1530;--maroon-light:#B5244E;
+  --gold:#FFC627;--gold-dark:#E0A800;--gold-light:#FFD966;
+  --white:#FFFFFF;--off-white:#FAFAF8;
+  --gray-50:#F7F6F3;--gray-100:#EDEBE5;--gray-200:#D5D2C8;
+  --text:#1A1814;--text-muted:#6B6560;--border:#E0DDD5;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.04);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.10);
+}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
-body{font-family:'Source Sans 3',sans-serif;background:var(--off-white);color:var(--text);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased;}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(140,29,64,0.97);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,198,39,0.25);padding:0 2rem;height:56px;display:flex;align-items:center;justify-content:space-between;}
-.nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
-.nav-logo{width:30px;height:30px;background:var(--gold);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:var(--maroon);}
-.nav-title{font-size:13px;font-weight:600;color:rgba(255,255,255,0.9);letter-spacing:0.02em;}
+body{font-family:'Source Sans 3',sans-serif;background:var(--off-white);color:var(--text);font-size:18px;line-height:1.75;-webkit-font-smoothing:antialiased;overflow-x:hidden;cursor:none;}
+
+/* ── Gold jellyfish cursor ── */
+#g-cur{position:fixed;width:10px;height:10px;background:var(--gold);border-radius:50%;pointer-events:none;z-index:99999;transform:translate(-50%,-50%);transition:transform 0.15s;}
+#g-ring{position:fixed;width:28px;height:28px;border:1.5px solid rgba(255,198,39,0.55);border-radius:50%;pointer-events:none;z-index:99998;transform:translate(-50%,-50%);}
+.link-hover #g-cur{transform:translate(-50%,-50%) scale(2.2);background:rgba(255,198,39,0.5);}
+.link-hover #g-ring{transform:translate(-50%,-50%) scale(0.7);border-color:var(--gold);}
+/* ── TURTLEBOT CURSOR (index only) ── */
+body{cursor:none;}
+#tb-cursor{position:fixed;width:48px;height:48px;pointer-events:none;z-index:99998;transform:translate(-50%,-50%);opacity:0.38;transition:opacity 0.3s;filter:drop-shadow(0 1px 4px rgba(140,29,64,0.25));}
+#tb-cursor:hover{opacity:0.6;}
+@media(max-width:960px){body{cursor:auto;}#tb-cursor{display:none;}}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:1000;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 4rem;transition:all 0.4s;}
+nav.scrolled{background:rgba(140,29,64,0.97);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,198,39,0.2);}
+nav.top{background:rgba(140,29,64,0.85);backdrop-filter:blur(12px);}
+.nav-brand{display:flex;align-items:center;gap:12px;text-decoration:none;}
+.nav-logo{width:34px;height:34px;background:var(--gold);border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:14px;font-weight:900;color:var(--maroon-dark);}
+.nav-title{font-size:15px;font-weight:600;color:rgba(255,255,255,0.95);}
 .nav-links{display:flex;list-style:none;align-items:center;}
-.nav-links > li > a{display:block;padding:0 14px;height:56px;line-height:56px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.75);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;transition:color 0.2s;}
-.nav-links > li > a:hover{color:var(--gold);}
+.nav-links>li>a{display:block;padding:0 18px;height:64px;line-height:64px;font-size:14px;font-weight:600;color:rgba(255,255,255,0.82);text-decoration:none;letter-spacing:0.05em;text-transform:uppercase;transition:color 0.2s;}
+.nav-links>li>a:hover{color:var(--gold);}
 .nav-dropdown{position:relative;}
-.nav-dropdown-menu{display:none;position:absolute;top:56px;left:0;background:rgba(107,21,48,0.99);backdrop-filter:blur(12px);border:1px solid rgba(255,198,39,0.2);border-radius:0 0 8px 8px;min-width:210px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.2);}
+.nav-dropdown-menu{display:none;position:absolute;top:64px;left:0;background:rgba(107,21,48,0.99);backdrop-filter:blur(16px);border:1px solid rgba(255,198,39,0.15);border-top:2px solid var(--gold);border-radius:0 0 12px 12px;min-width:250px;z-index:200;box-shadow:0 20px 40px rgba(0,0,0,0.35);}
 .nav-dropdown:hover .nav-dropdown-menu{display:block;}
-.nav-dropdown-menu a{display:block;padding:10px 18px;height:auto;line-height:1.4;font-size:12px;font-weight:500;color:rgba(255,255,255,0.75);text-decoration:none;text-transform:none;letter-spacing:0.02em;transition:background 0.15s,color 0.15s;border-bottom:1px solid rgba(255,255,255,0.06);}
-.nav-dropdown-menu a:last-child{border-bottom:none;border-radius:0 0 8px 8px;}
-.nav-dropdown-menu a:hover{background:rgba(255,198,39,0.1);color:var(--gold);}
-.container{max-width:1060px;margin:0 auto;}
-section{padding:80px 2rem;}
-.section-eyebrow{font-size:11px;font-weight:600;color:var(--maroon);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
-.section-eyebrow::before{content:'';display:block;width:24px;height:2px;background:var(--gold);border-radius:2px;}
-.section-title{font-family:'Playfair Display',serif;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:600;color:var(--text);line-height:1.25;margin-bottom:12px;}
-.section-desc{font-size:1rem;font-weight:300;color:var(--text-muted);max-width:580px;margin-bottom:48px;}
-.fade-in{opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease;}
-.fade-in.visible{opacity:1;transform:none;}
-footer{background:var(--maroon-dark);padding:40px 2rem;text-align:center;}
-.footer-logo{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:var(--white);margin-bottom:8px;}
-.footer-sub{font-size:12px;color:rgba(255,255,255,0.45);margin-bottom:20px;}
-.footer-links{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;}
-.footer-links a{font-size:12px;color:rgba(255,198,39,0.7);text-decoration:none;transition:color 0.2s;}
-.footer-links a:hover{color:var(--gold);}
-@media(max-width:768px){.nav-links{display:none;}}
-/* HERO */
-.hero{min-height:100vh;background:var(--maroon);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 2rem 80px;position:relative;overflow:hidden;}
-.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 100%,rgba(255,198,39,0.12) 0%,transparent 70%),radial-gradient(ellipse 40% 40% at 20% 20%,rgba(255,255,255,0.04) 0%,transparent 60%);}
-.hero-grid{position:absolute;inset:0;opacity:0.04;background-image:linear-gradient(rgba(255,255,255,0.5) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.5) 1px,transparent 1px);background-size:48px 48px;}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(255,198,39,0.15);border:1px solid rgba(255,198,39,0.3);border-radius:100px;padding:6px 16px;font-size:12px;font-weight:600;color:var(--gold);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:28px;position:relative;}
+.nav-dropdown-menu a{display:block;padding:13px 22px;font-size:14px;color:rgba(255,255,255,0.75);text-decoration:none;transition:all 0.15s;border-bottom:1px solid rgba(255,255,255,0.05);}
+.nav-dropdown-menu a:last-child{border-bottom:none;border-radius:0 0 12px 12px;}
+.nav-dropdown-menu a:hover{background:rgba(255,198,39,0.08);color:var(--gold);padding-left:28px;}
+.nav-gh{background:var(--gold)!important;color:var(--maroon-dark)!important;padding:8px 18px!important;border-radius:8px;height:auto!important;line-height:1.4!important;font-size:13px!important;font-weight:700!important;margin-left:8px;display:inline-block!important;}
+.nav-gh:hover{background:var(--gold-light)!important;transform:translateY(-1px);box-shadow:0 4px 12px rgba(255,198,39,0.3);}
+
+/* ── HERO — SCREENSHOT PARALLAX ── */
+.hero{min-height:100vh;background:var(--maroon);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:140px 4rem 100px;position:relative;overflow:hidden;}
+.hero-bg{position:absolute;inset:0;background-image:url('assets/images/ss1.png');background-size:cover;background-position:right center;background-attachment:fixed;opacity:0.18;}
+.hero-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(140,29,64,0.92) 0%,rgba(107,21,48,0.80) 60%,rgba(140,29,64,0.70) 100%);}
+#hero-canvas{position:absolute;inset:0;width:100%;height:100%;opacity:0.45;}
+.hero-content{position:relative;z-index:2;max-width:1000px;width:100%;}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(255,198,39,0.12);border:1px solid rgba(255,198,39,0.28);border-radius:100px;padding:8px 20px;font-size:12px;font-weight:700;color:var(--gold);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:32px;}
 .hero-eyebrow::before{content:'';width:6px;height:6px;background:var(--gold);border-radius:50%;animation:pulse 2s infinite;}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.5;transform:scale(0.8);}}
-.hero h1{font-family:'Playfair Display',serif;font-size:clamp(2.2rem,5vw,3.8rem);font-weight:700;color:var(--white);line-height:1.15;max-width:820px;margin-bottom:20px;position:relative;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.7);}}
+.hero h1{font-family:'Playfair Display',serif;font-size:clamp(2.8rem,6vw,5rem);font-weight:900;color:white;line-height:1.1;margin-bottom:24px;letter-spacing:-0.02em;}
 .hero h1 span{color:var(--gold);}
-.hero-sub{font-size:1.1rem;font-weight:300;color:rgba(255,255,255,0.65);max-width:560px;margin-bottom:48px;position:relative;}
-.hero-meta{display:flex;align-items:center;gap:32px;flex-wrap:wrap;justify-content:center;margin-bottom:52px;position:relative;}
-.hero-meta-item{text-align:center;}
-.hero-meta-item .label{font-size:10px;font-weight:600;color:rgba(255,198,39,0.7);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:2px;}
-.hero-meta-item .value{font-size:14px;font-weight:500;color:rgba(255,255,255,0.85);}
-.hero-divider{width:1px;height:36px;background:rgba(255,255,255,0.15);}
-.hero-ctas{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;position:relative;}
-.btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--gold);color:var(--maroon-dark);padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;transition:all 0.2s;}
-.btn-primary:hover{background:var(--gold-light);transform:translateY(-1px);box-shadow:0 4px 16px rgba(255,198,39,0.35);}
-.btn-secondary{display:inline-flex;align-items:center;gap:8px;background:transparent;color:rgba(255,255,255,0.85);padding:12px 28px;border-radius:8px;font-size:14px;font-weight:500;text-decoration:none;border:1px solid rgba(255,255,255,0.25);transition:all 0.2s;}
-.btn-secondary:hover{border-color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.06);}
-.hero-scroll{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;color:rgba(255,255,255,0.35);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;}
-.scroll-arrow{width:20px;height:20px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);animation:bounce 2s infinite;}
-@keyframes bounce{0%,100%{transform:rotate(45deg) translateY(0);}50%{transform:rotate(45deg) translateY(4px);}}
-/* MISSION */
-#mission{background:var(--white);}
-.mission-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;}
-.mission-text p{font-size:1rem;color:var(--text-muted);margin-bottom:16px;font-weight:300;}
-.mission-stats{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-.stat-card{background:var(--gray-50);border:1px solid var(--border);border-radius:12px;padding:20px;}
-.stat-card .stat-num{font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:var(--maroon);line-height:1;margin-bottom:4px;}
-.stat-card .stat-unit{font-size:12px;font-weight:500;color:var(--gold-dark);}
-.stat-card .stat-label{font-size:12px;color:var(--text-muted);margin-top:4px;}
-/* ARCHITECTURE */
-#architecture{background:var(--gray-50);}
-.arch-container{background:var(--white);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow);}
-.arch-header{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--gray-50);}
-.arch-header span{font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;}
-.arch-zoom-btn{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--maroon);cursor:pointer;background:none;border:none;padding:4px 10px;border-radius:6px;transition:background 0.2s;}
-.arch-zoom-btn:hover{background:rgba(140,29,64,0.06);}
-.arch-img-wrap{padding:24px;cursor:zoom-in;}
-.arch-img-wrap img{width:100%;border-radius:8px;display:block;transition:transform 0.2s;}
-.arch-img-wrap:hover img{transform:scale(1.01);}
-.arch-pipeline{display:flex;align-items:center;padding:14px 24px;border-top:1px solid var(--border);background:var(--gray-50);gap:8px;flex-wrap:wrap;}
-.pipe-step{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;}
-.pipe-dot{width:8px;height:8px;border-radius:50%;}
-.pipe-arrow{color:var(--gray-200);font-size:14px;}
-/* SENSORS */
-#sensors{background:var(--white);}
-.table-wrap{border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);}
-table{width:100%;border-collapse:collapse;}
-thead tr{background:var(--maroon);}
-thead th{padding:14px 18px;text-align:left;font-size:11px;font-weight:600;color:rgba(255,255,255,0.85);letter-spacing:0.06em;text-transform:uppercase;}
-tbody tr{border-bottom:1px solid var(--border);transition:background 0.15s;}
-tbody tr:last-child{border-bottom:none;}
-tbody tr:hover{background:var(--gray-50);}
-tbody td{padding:14px 18px;font-size:13px;color:var(--text);}
-.topic-badge{font-family:'JetBrains Mono',monospace;font-size:11px;background:rgba(140,29,64,0.08);color:var(--maroon);padding:3px 8px;border-radius:4px;border:1px solid rgba(140,29,64,0.15);}
-/* MILESTONES */
-#milestones{background:var(--gray-50);}
-.timeline{position:relative;padding-left:40px;}
-.timeline::before{content:'';position:absolute;left:13px;top:8px;bottom:8px;width:2px;background:linear-gradient(to bottom,var(--maroon),var(--gold),var(--gray-200));border-radius:2px;}
-.timeline-item{position:relative;margin-bottom:32px;}
-.timeline-item:last-child{margin-bottom:0;}
-.timeline-dot{position:absolute;left:-34px;top:8px;width:16px;height:16px;border-radius:50%;border:2.5px solid var(--white);}
-.timeline-dot.done{background:var(--maroon);box-shadow:0 0 0 2px var(--maroon);}
-.timeline-dot.submitted{background:var(--gold-dark);box-shadow:0 0 0 2px var(--gold-dark);}
-.timeline-dot.future{background:var(--gray-200);box-shadow:0 0 0 2px var(--gray-200);}
-.timeline-card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:24px 28px;box-shadow:var(--shadow);transition:box-shadow 0.2s;}
-.timeline-card:hover{box-shadow:var(--shadow-lg);}
-.timeline-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px;}
-.timeline-title{font-size:1.05rem;font-weight:600;color:var(--text);}
-.timeline-sub{font-size:12px;color:var(--text-muted);margin-top:2px;}
-.ms-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px;white-space:nowrap;}
-.ms-badge.done{background:#E8F5E9;color:#2E7D32;}
-.ms-badge.submitted{background:#FFF8E1;color:#856404;}
-.ms-badge.future{background:var(--gray-100);color:var(--gray-600);}
-.timeline-body{font-size:13.5px;color:var(--text-muted);font-weight:300;margin-bottom:16px;}
-.timeline-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;}
-.tag{font-size:11px;font-weight:500;background:var(--gray-50);border:1px solid var(--border);color:var(--text-muted);padding:3px 10px;border-radius:100px;}
-.timeline-meta{display:flex;gap:16px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;align-items:center;}
-.timeline-meta-item{font-size:12px;color:var(--text-muted);}
-.timeline-meta-item strong{color:var(--text);font-weight:600;}
-.ms-links{display:flex;gap:12px;margin-left:auto;align-items:center;flex-wrap:wrap;}
-.ms-link{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--maroon);text-decoration:none;padding:4px 10px;background:rgba(140,29,64,0.06);border-radius:6px;transition:background 0.15s;}
-.ms-link:hover{background:rgba(140,29,64,0.12);}
-.ms-link.gold{color:var(--gold-dark);background:rgba(224,168,0,0.08);}
-.ms-link.gold:hover{background:rgba(224,168,0,0.15);}
-.ms-link.blue{color:#1a5276;background:rgba(26,82,118,0.08);}
-.ms-link.blue:hover{background:rgba(26,82,118,0.14);}
-/* TEAM */
-#team{background:var(--white);}
-.team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
-.team-card{background:var(--gray-50);border:1px solid var(--border);border-radius:16px;padding:28px 24px;text-align:center;transition:box-shadow 0.2s,transform 0.2s;}
-.team-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);}
-.team-avatar{width:72px;height:72px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--white);position:relative;}
-.team-avatar::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--gold);opacity:0.5;}
-.av-a{background:linear-gradient(135deg,var(--maroon),var(--maroon-light));}
-.av-b{background:linear-gradient(135deg,#1a5276,#2980b9);}
-.av-c{background:linear-gradient(135deg,#145a32,#1e8449);}
-.team-name{font-size:1rem;font-weight:600;color:var(--text);margin-bottom:2px;}
-.team-role{font-size:12px;color:var(--maroon);font-weight:500;margin-bottom:4px;}
-.team-person{font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-bottom:16px;}
-.team-tasks{list-style:none;text-align:left;font-size:12px;color:var(--text-muted);}
-.team-tasks li{padding:3px 0;padding-left:14px;position:relative;}
-.team-tasks li::before{content:'→';position:absolute;left:0;color:var(--gold-dark);font-size:10px;}
-/* STATS */
-#stats{background:var(--gray-50);}
-.stats-cards{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:32px;}
-.stats-card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 14px;text-align:center;box-shadow:var(--shadow);}
-.stats-card .s-num{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:var(--maroon);line-height:1;}
-.stats-card .s-label{font-size:11px;color:var(--text-muted);margin-top:4px;}
-.member-bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
-.member-bar-label{font-size:12px;font-weight:500;color:var(--text);width:140px;flex-shrink:0;}
-.member-bar-track{flex:1;height:8px;background:var(--gray-100);border-radius:100px;overflow:hidden;}
-.member-bar-fill{height:100%;border-radius:100px;transition:width 0.6s ease;}
-.member-bar-count{font-size:12px;font-weight:600;color:var(--text-muted);width:40px;text-align:right;}
-.commits-header{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
-.commits-header a{font-size:12px;color:var(--maroon);text-decoration:none;font-weight:500;}
-.commits-table-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;max-height:280px;overflow-y:auto;}
-.commits-table-wrap table thead th{background:var(--maroon);position:sticky;top:0;z-index:1;}
-.commit-sha a{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--maroon);text-decoration:none;background:rgba(140,29,64,0.06);padding:2px 6px;border-radius:4px;}
-.dl-btn{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;text-decoration:none;margin-right:3px;}
-.dl-zip{background:#E8F5E9;color:#2E7D32;}
-.dl-tar{background:rgba(140,29,64,0.08);color:var(--maroon);}
-/* PROGRESS */
-#progress{background:var(--white);}
-.gantt-embed-wrap{border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-lg);}
-.gantt-embed-header{padding:14px 24px;background:var(--maroon);display:flex;align-items:center;justify-content:space-between;}
-.gantt-embed-header span{font-size:13px;font-weight:600;color:rgba(255,255,255,0.9);}
-.gantt-embed-header a{font-size:12px;color:var(--gold);text-decoration:none;font-weight:500;}
-.gantt-embed-header a:hover{text-decoration:underline;}
-.gantt-embed-wrap iframe{width:100%;height:600px;border:none;display:block;}
-/* LIGHTBOX */
-.lightbox{display:none;position:fixed;inset:0;background:rgba(20,16,12,0.92);z-index:1000;align-items:center;justify-content:center;cursor:zoom-out;}
-.lightbox.active{display:flex;}
-.lightbox img{max-width:92vw;max-height:88vh;border-radius:8px;}
-.lightbox-close{position:fixed;top:20px;right:28px;color:white;font-size:22px;cursor:pointer;background:rgba(255,255,255,0.1);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:none;transition:background 0.2s;}
-.lightbox-close:hover{background:rgba(255,255,255,0.2);}
-@media(max-width:768px){.mission-grid,.team-grid{grid-template-columns:1fr;}.stats-cards{grid-template-columns:repeat(3,1fr);}}
+.hero-sub{font-size:clamp(1rem,1.8vw,1.2rem);font-weight:300;color:rgba(255,255,255,0.6);max-width:580px;margin:0 auto 52px;line-height:1.75;}
+.hero-stats{display:flex;align-items:stretch;justify-content:center;margin-bottom:52px;border:1px solid rgba(255,255,255,0.1);border-radius:16px;overflow:hidden;background:rgba(0,0,0,0.15);backdrop-filter:blur(8px);}
+.hstat{text-align:center;padding:22px 36px;border-right:1px solid rgba(255,255,255,0.08);flex:1;}
+.hstat:last-child{border-right:none;}
+.hstat .n{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:var(--gold);display:block;}
+.hstat .l{font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;}
+.hero-ctas{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+.btn-pri{display:inline-flex;align-items:center;gap:8px;background:var(--gold);color:var(--maroon-dark);padding:15px 34px;border-radius:10px;font-size:15px;font-weight:700;text-decoration:none;transition:all 0.25s;}
+.btn-pri:hover{background:var(--gold-light);transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,198,39,0.35);}
+.btn-sec{display:inline-flex;align-items:center;gap:8px;background:transparent;color:rgba(255,255,255,0.85);padding:15px 34px;border-radius:10px;font-size:15px;font-weight:500;text-decoration:none;border:1px solid rgba(255,255,255,0.22);transition:all 0.25s;}
+.btn-sec:hover{border-color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.06);}
+.scroll-hint{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;color:rgba(255,255,255,0.3);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;}
+.scroll-arr{width:20px;height:20px;border-right:1.5px solid rgba(255,255,255,0.3);border-bottom:1.5px solid rgba(255,255,255,0.3);transform:rotate(45deg);animation:bob 2s ease-in-out infinite;}
+@keyframes bob{0%,100%{transform:rotate(45deg) translateY(0);}50%{transform:rotate(45deg) translateY(5px);}}
+
+/* ── WHAT WE ARE — WHITE ── */
+#what{background:var(--white);padding:120px 4rem;}
+.what-inner{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;}
+.eyebrow-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.eyebrow-line{width:32px;height:2px;background:var(--gold);}
+.eyebrow-txt{font-size:12px;font-weight:700;color:var(--maroon);letter-spacing:0.12em;text-transform:uppercase;}
+.section-h2{font-family:'Playfair Display',serif;font-size:clamp(1.8rem,3vw,2.6rem);font-weight:700;color:var(--text);line-height:1.2;margin-bottom:20px;}
+.section-h2 em{color:var(--maroon);font-style:normal;}
+.what-text p{font-size:1.05rem;color:var(--text-muted);line-height:1.8;margin-bottom:14px;}
+.sys-diagram{background:var(--gray-50);border:1px solid var(--border);border-radius:14px;padding:28px;}
+.sys-node{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;transition:all 0.3s;box-shadow:var(--shadow);}
+.sys-node:hover{border-color:var(--gold);transform:translateX(5px);box-shadow:var(--shadow-lg);}
+.sn-icon{font-size:1.3rem;width:32px;text-align:center;flex-shrink:0;}
+.sn-label{font-size:12px;font-weight:700;color:var(--maroon);text-transform:uppercase;letter-spacing:0.05em;}
+.sn-detail{font-size:12px;color:var(--text-muted);margin-top:1px;}
+.sys-arrow{text-align:center;color:var(--gray-200);margin:2px 0;margin-left:16px;font-size:14px;}
+
+/* ── MILESTONES — GRAY ── */
+#milestones{background:var(--gray-50);padding:120px 4rem;}
+.section-inner{max-width:1200px;margin:0 auto;}
+.section-desc{font-size:1.05rem;color:var(--text-muted);max-width:600px;margin-bottom:56px;}
+
+/* TurtleBot animation track */
+.tb-track-wrap{position:relative;margin:40px 0;}
+.tb-rail{height:3px;background:var(--gray-200);border-radius:3px;position:relative;overflow:visible;}
+.tb-fill{height:100%;background:linear-gradient(90deg,var(--maroon),var(--gold));border-radius:3px;width:100%;}
+.tb-anim-track{height:70px;position:relative;margin-top:8px;}
+#tb-bot{position:absolute;left:0;top:0;transition:left 0.05s linear;}
+
+.ms-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:48px;}
+.ms-card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:28px;box-shadow:var(--shadow);transition:all 0.3s;position:relative;overflow:hidden;}
+.ms-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.ms-card.m1::before{background:var(--gray-200);}
+.ms-card.m2::before{background:linear-gradient(90deg,var(--maroon),var(--gold));}
+.ms-card.m3::before{background:var(--gold);}
+.ms-card:hover{transform:translateY(-5px);box-shadow:var(--shadow-lg);}
+.ms-date{font-size:12px;color:var(--text-muted);margin-bottom:6px;}
+.ms-title{font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--text);margin-bottom:4px;}
+.ms-subtitle{font-size:14px;color:var(--text-muted);margin-bottom:14px;}
+.ms-status{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:#d4edda;color:#155724;margin-bottom:16px;}
+.ms-status::before{content:'✓';}
+.ms-link{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--maroon);text-decoration:none;transition:gap 0.2s;}
+.ms-link:hover{gap:10px;}
+
+/* ── TEAM — WHITE ── */
+#team{background:var(--white);padding:120px 4rem;}
+.team-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;}
+.team-card{background:var(--gray-50);border:1px solid var(--border);border-radius:16px;padding:32px;transition:all 0.3s;}
+.team-card:hover{transform:translateY(-6px);box-shadow:var(--shadow-lg);background:var(--white);}
+.avatar{width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:white;margin-bottom:18px;}
+.t-name{font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:3px;}
+.t-email{font-size:13px;color:var(--text-muted);margin-bottom:10px;}
+.t-role{font-size:14px;font-weight:600;color:var(--maroon);margin-bottom:14px;}
+.t-desc{font-size:14px;color:var(--text-muted);line-height:1.65;}
+.t-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;}
+.tag{background:var(--gray-100);color:var(--text-muted);font-size:12px;padding:3px 10px;border-radius:6px;}
+
+/* ── CODE — GRAY ── */
+#code-sec{background:var(--gray-50);padding:120px 4rem;}
+.code-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;}
+.code-card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:22px;transition:all 0.3s;box-shadow:var(--shadow);}
+.code-card:hover{border-color:var(--gold);transform:translateY(-3px);box-shadow:var(--shadow-lg);}
+.code-card .file{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--maroon);font-weight:600;margin-bottom:8px;}
+.code-card .desc{font-size:13.5px;color:var(--text-muted);line-height:1.6;margin-bottom:12px;}
+.code-card a{font-size:13.5px;color:var(--maroon);text-decoration:none;font-weight:500;display:inline-flex;align-items:center;gap:4px;}
+.code-card a:hover{color:var(--maroon-dark);text-decoration:underline;}
+
+/* ── STATS — MAROON ── */
+#stats{background:var(--maroon);padding:100px 4rem;}
+#stats .section-h2{color:white;}
+#stats .eyebrow-txt{color:var(--gold);}
+#stats .eyebrow-line{background:var(--gold);}
+.gh-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:40px;}
+.gh-cell{background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:22px 14px;text-align:center;}
+.gh-cell .n{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:var(--gold);}
+.gh-cell .l{font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.06em;margin-top:4px;}
+.bar-row{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.bar-label{font-size:14px;color:rgba(255,255,255,0.65);width:140px;flex-shrink:0;}
+.bar-track{flex:1;height:7px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:4px;transition:width 1.5s ease;}
+.bar-count{font-size:13px;color:rgba(255,255,255,0.3);width:28px;text-align:right;}
+.commits-wrap{background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow:hidden;margin-top:28px;}
+.commits-head{padding:14px 22px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;}
+.ctable{width:100%;border-collapse:collapse;font-size:14px;}
+.ctable th{padding:10px 18px;text-align:left;font-size:12px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;background:rgba(0,0,0,0.1);}
+.ctable td{padding:10px 18px;border-top:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.7);}
+.ctable tr:hover td{background:rgba(255,255,255,0.02);}
+.sha{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--gold-light);text-decoration:none;}
+.sha:hover{color:white;}
+.dl-btn{display:inline-block;font-size:11px;padding:2px 7px;border-radius:4px;text-decoration:none;margin-right:3px;background:rgba(255,198,39,0.15);color:var(--gold);}
+
+/* ── FOOTER ── */
+footer{background:var(--maroon-dark);padding:56px 4rem;}
+.footer-inner{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:2fr 1fr 1fr;gap:56px;margin-bottom:32px;}
+.f-brand .logo{font-family:'Playfair Display',serif;font-size:1.15rem;color:white;font-weight:700;margin-bottom:8px;}
+.f-brand p{font-size:13.5px;color:rgba(255,255,255,0.35);line-height:1.7;max-width:280px;}
+.f-col h4{font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:16px;}
+.f-col a{display:block;font-size:14px;color:rgba(255,255,255,0.4);text-decoration:none;margin-bottom:9px;transition:color 0.2s;}
+.f-col a:hover{color:rgba(255,255,255,0.8);}
+.f-bottom{max-width:1200px;margin:0 auto;padding-top:22px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,0.2);}
+
+/* ── HERO stronger overlay ── */
+.hero::before{content:'';position:absolute;inset:0;background:rgba(107,21,48,0.55);z-index:1;pointer-events:none;}
+.hero-content{z-index:3!important;}
+/* ── RADAR DOTS pattern on light sections ── */
+#what::after,#milestones::after,#team::after,#code-sec::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(140,29,64,0.06) 1px,transparent 1px);background-size:32px 32px;z-index:0;}
+#what,#milestones,#team,#code-sec{position:relative;}
+#what>*,#milestones>*,#team>*,#code-sec>*{position:relative;z-index:1;}
+/* ── APPLE single-motion scroll ── */
+.reveal{opacity:0;transform:translateY(40px);transition:opacity 0.9s cubic-bezier(0.25,0.46,0.45,0.94),transform 0.9s cubic-bezier(0.25,0.46,0.45,0.94);}
+.reveal.visible{opacity:1;transform:translateY(0);}
+.reveal-l{opacity:0;transform:translateX(-50px);transition:opacity 0.9s cubic-bezier(0.25,0.46,0.45,0.94),transform 0.9s cubic-bezier(0.25,0.46,0.45,0.94);}
+.reveal-l.visible{opacity:1;transform:translateX(0);}
+.reveal-r{opacity:0;transform:translateX(50px);transition:opacity 0.9s cubic-bezier(0.25,0.46,0.45,0.94),transform 0.9s cubic-bezier(0.25,0.46,0.45,0.94);}
+.reveal-r.visible{opacity:1;transform:translateX(0);}
+/* ── ROBOTICS COMMIT BARS ── */
+.bar-row{position:relative;}
+.bar-fill{position:relative;}
+.bar-fill::after{content:'⬡';position:absolute;right:-8px;top:-5px;font-size:10px;opacity:0.6;}
+/* ── STATS SECTION radar bg ── */
+#stats::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,198,39,0.05) 1px,transparent 1px);background-size:40px 40px;z-index:0;}
+#stats{position:relative;}
+#stats>*{position:relative;z-index:1;}
+/* ── SCROLL ANIMATIONS ── */
+.reveal{opacity:0;transform:translateY(32px);transition:opacity 0.75s ease,transform 0.75s ease;}
+.reveal.visible{opacity:1;transform:none;}
+.reveal-l{opacity:0;transform:translateX(-32px);transition:opacity 0.75s ease,transform 0.75s ease;}
+.reveal-l.visible{opacity:1;transform:none;}
+.reveal-r{opacity:0;transform:translateX(32px);transition:opacity 0.75s ease,transform 0.75s ease;}
+.reveal-r.visible{opacity:1;transform:none;}
+.d1{transition-delay:0.1s!important;}.d2{transition-delay:0.2s!important;}.d3{transition-delay:0.3s!important;}.d4{transition-delay:0.4s!important;}
+
+@media(max-width:960px){
+  .what-inner,.team-grid,.ms-grid,.code-grid,.footer-inner{grid-template-columns:1fr;}
+  nav,.hero,#what,#milestones,#team,#code-sec,#stats,footer{padding-left:1.5rem;padding-right:1.5rem;}
+  .hero-stats{flex-direction:column;}
+  .hstat{border-right:none;border-bottom:1px solid rgba(255,255,255,0.08);}
+  .hstat:last-child{border-bottom:none;}
+  .gh-grid{grid-template-columns:1fr 1fr 1fr;}
+  body{cursor:auto;}
+  #cur,#cur-ring{display:none;}
+}
 </style>
 </head>
 <body>
 
-<nav>
-  <a class="nav-brand" href="#">
-    <div class="nav-logo">RAS</div>
-    <span class="nav-title">Frontier Exploration · ASU</span>
+<div id="g-cur"></div>
+<div id="g-ring"></div>
+<div id="tb-cursor">
+  <svg viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+    <!-- Outer body ring -->
+    <circle cx="26" cy="26" r="24" fill="rgba(255,255,255,0.92)" stroke="#8C1D40" stroke-width="2"/>
+    <!-- Inner platform circle -->
+    <circle cx="26" cy="26" r="16" fill="#f0e8ec" stroke="#8C1D40" stroke-width="1.5"/>
+    <!-- Center hub -->
+    <circle cx="26" cy="26" r="7" fill="#8C1D40"/>
+    <circle cx="26" cy="26" r="4" fill="white"/>
+    <circle cx="26" cy="26" r="1.5" fill="#8C1D40"/>
+    <!-- Wheels left and right - rounded rectangles -->
+    <rect x="1" y="19" width="8" height="14" rx="3" fill="#6B1530"/>
+    <rect x="43" y="19" width="8" height="14" rx="3" fill="#6B1530"/>
+    <!-- Front caster -->
+    <circle cx="26" cy="6" r="3" fill="#6B1530"/>
+    <!-- LiDAR rays - gold, from center -->
+    <g stroke="#FFC627" stroke-width="1" opacity="0.8">
+      <line x1="26" y1="26" x2="26" y2="2"/>
+      <line x1="26" y1="26" x2="44" y2="8"/>
+      <line x1="26" y1="26" x2="50" y2="26"/>
+      <line x1="26" y1="26" x2="44" y2="44"/>
+      <line x1="26" y1="26" x2="26" y2="50"/>
+      <line x1="26" y1="26" x2="8" y2="44"/>
+      <line x1="26" y1="26" x2="2" y2="26"/>
+      <line x1="26" y1="26" x2="8" y2="8"/>
+    </g>
+    <!-- Direction arrow - gold solid triangle at top -->
+    <polygon points="26,1 22,8 30,8" fill="#FFC627" stroke="#E0A800" stroke-width="0.5"/>
+    <!-- Camera module top (OAK-D shape) -->
+    <rect x="20" y="11" width="12" height="5" rx="2" fill="#333" opacity="0.7"/>
+    <circle cx="24" cy="13.5" r="1.5" fill="#64b5f6"/>
+    <circle cx="28" cy="13.5" r="1.5" fill="#64b5f6"/>
+  </svg>
+</div>
+
+<!-- NAV -->
+<nav id="nav" class="top">
+  <a class="nav-brand" href="index.html">
+    <div class="nav-logo">AFE</div>
+    <span class="nav-title">Autonomous Frontier Exploration</span>
   </a>
   <ul class="nav-links">
-    <li><a href="#mission">Mission</a></li>
-    <li><a href="#architecture">Architecture</a></li>
-    <li><a href="#sensors">Sensors</a></li>
+    <li><a href="#what">Mission</a></li>
     <li class="nav-dropdown">
       <a href="#milestones">Milestones ▾</a>
       <div class="nav-dropdown-menu">
         <a href="#milestones">↓ Timeline overview</a>
-        <a href="milestones/milestone1.html">M1 — Proposal</a>
-        <a href="milestones/milestone2.html">M2 — Technical Proof</a>
-        <a href="milestones/milestone3.html">M3 — Final Dossier 🆕</a>
-        <a href="math/m2-mathematics.html">M2 — Mathematics</a>
-        <a href="math/mathematics_merged.tex" target="_blank">Math LaTeX (.tex) ↗</a>
+        <a href="milestones/milestone1.html">Milestone 1 — Proposal &amp; Architecture</a>
+        <a href="milestones/milestone2.html">Milestone 2 — Technical Proof</a>
+        <a href="milestones/milestone3.html">Milestone 3 — Final Dossier ✦</a>
       </div>
     </li>
+    <li><a href="report.html">Report</a></li>
     <li><a href="#team">Team</a></li>
     <li><a href="#stats">Stats</a></li>
-    <li><a href="#progress">Progress</a></li>
+    <li><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank" class="nav-gh">GitHub ↗</a></li>
   </ul>
 </nav>
 
-<section class="hero" id="home">
-  <div class="hero-grid"></div>
-  <div class="hero-eyebrow">RAS 598: Mobile Robotics · ASU Spring 2026</div>
-  <h1>Autonomous Frontier Exploration<br/>with <span>Semantic Hazard Mapping</span></h1>
-  <p class="hero-sub">A TurtleBot4 Lite that builds its own map, classifies hazards in real-time, and navigates unknown environments — entirely without a prior map.</p>
-  <div class="hero-meta">
-    <div class="hero-meta-item"><div class="label">Platform</div><div class="value">TurtleBot4 Lite</div></div>
-    <div class="hero-divider"></div>
-    <div class="hero-meta-item"><div class="label">Framework</div><div class="value">ROS2 Jazzy</div></div>
-    <div class="hero-divider"></div>
-    <div class="hero-meta-item"><div class="label">Goal Coverage</div><div class="value">≥ 80% Floor Area</div></div>
-    <div class="hero-divider"></div>
-    <div class="hero-meta-item"><div class="label">Custom Nodes</div><div class="value">3 Built</div></div>
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-overlay"></div>
+  <div style="position:absolute;inset:0;background-image:url('assets/images/ss1.png');background-size:cover;background-position:center right;opacity:0.15;z-index:0;"></div>
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-content">
+    <div class="hero-eyebrow">RAS 598 · Mobile Robotics · Arizona State University · Spring 2026</div>
+    <h1>Autonomous <span>Frontier</span><br/>Exploration &amp; <span>Hazard</span><br/>Mapping</h1>
+    <p class="hero-sub">A TurtleBot4 Lite that explores unknown environments, builds real-time maps, and detects semantic hazards — fully autonomous, zero human input.</p>
+    <div class="hero-stats">
+      <div class="hstat"><span class="n">5</span><span class="l">Custom ROS 2 Nodes</span></div>
+      <div class="hstat"><span class="n">13</span><span class="l">HAZMAT Classes</span></div>
+      <div class="hstat"><span class="n">360°</span><span class="l">LiDAR Coverage</span></div>
+      <div class="hstat"><span class="n">0.35 m/s</span><span class="l">Max Speed</span></div>
+      <div class="hstat"><span class="n">&lt;100ms</span><span class="l">Hazard Detection</span></div>
+    </div>
+    <div class="hero-ctas">
+      <a class="btn-pri" href="milestones/milestone3.html">View Final Dossier →</a>
+      <a class="btn-sec" href="report.html">Full Project Report</a>
+    </div>
   </div>
-  <div class="hero-ctas">
-    <a class="btn-primary" href="#milestones">View Milestones</a>
-    <a class="btn-secondary" href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank">GitHub Repository</a>
-  </div>
-  <div class="hero-scroll"><span>Scroll</span><div class="scroll-arrow"></div></div>
+  <div class="scroll-hint"><span>Scroll</span><div class="scroll-arr"></div></div>
 </section>
 
-<section id="mission">
-  <div class="container">
-    <div class="fade-in">
-      <div class="section-eyebrow">Mission</div>
-      <h2 class="section-title">What we're building and why</h2>
+<!-- WHAT WE ARE -->
+<section id="what">
+  <div class="what-inner">
+    <div class="reveal-l">
+      <div class="eyebrow-row"><div class="eyebrow-line"></div><span class="eyebrow-txt">What we built &amp; why</span></div>
+      <h2 class="section-h2">A robot that<br/><em>sees danger</em><br/>before humans do</h2>
+      <p>We built an autonomous ground robot capable of navigating entirely unknown indoor environments — no pre-loaded maps, no human guidance. It simultaneously maps its surroundings using SLAM, decides where to explore next using frontier-based planning, and detects semantic hazards including HAZMAT signs, fire, cliffs, and narrow corridors using a five-layer sensor fusion pipeline.</p>
+      <p>The motivation is search-and-rescue and industrial inspection — environments too dangerous for immediate human entry. The robot generates a complete annotated map so first responders know exactly what they're walking into before they enter.</p>
     </div>
-    <div class="mission-grid fade-in">
-      <div class="mission-text">
-        <p>Standard mobile robot deployments require a pre-built map before autonomous navigation is possible. This creates a chicken-and-egg problem in unknown or dynamically changed environments.</p>
-        <p>Our system solves this by combining frontier-based exploration with semantic awareness — the robot builds, classifies, and navigates its environment simultaneously from scratch, with no prior map and no human guidance.</p>
-        <p>The robot semantically classifies regions as <strong>Clear</strong>, <strong>Debris</strong>, or <strong>Hazardous</strong> using its OAK-D RGB-D camera, RPLIDAR, and onboard Create3 sensors, producing a labeled occupancy map as output.</p>
-      </div>
-      <div class="mission-stats">
-        <div class="stat-card fade-in"><div class="stat-num">80<span class="stat-unit">%</span></div><div class="stat-label">Target floor coverage</div></div>
-        <div class="stat-card fade-in"><div class="stat-num">3</div><div class="stat-label">Custom ROS2 nodes</div></div>
-        <div class="stat-card fade-in"><div class="stat-num">5</div><div class="stat-label">Hazard detection layers</div></div>
-        <div class="stat-card fade-in"><div class="stat-num">5<span class="stat-unit">s</span></div><div class="stat-label">Deadman switch timeout</div></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="architecture">
-  <div class="container">
-    <div class="fade-in">
-      <div class="section-eyebrow">System Design</div>
-      <h2 class="section-title">High-level system architecture</h2>
-      <p class="section-desc">The system follows the Perception → Estimation → Planning → Actuation pipeline with a semantic bypass for hazard-aware goal selection.</p>
-    </div>
-    <div class="arch-container fade-in">
-      <div class="arch-header">
-        <span>system_architecture.png</span>
-        <button class="arch-zoom-btn" onclick="document.getElementById('lightbox').classList.add('active')">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg> Zoom
-        </button>
-      </div>
-      <div class="arch-img-wrap" onclick="document.getElementById('lightbox').classList.add('active')">
-        <img src="assets/images/architecture.png" alt="System Architecture"/>
-      </div>
-      <div class="arch-pipeline">
-        <div class="pipe-step"><div class="pipe-dot" style="background:#8C1D40;"></div>Perception</div>
-        <span class="pipe-arrow">→</span>
-        <div class="pipe-step"><div class="pipe-dot" style="background:#B5244E;"></div>Estimation</div>
-        <span class="pipe-arrow">→</span>
-        <div class="pipe-step"><div class="pipe-dot" style="background:#E0A800;"></div>Planning</div>
-        <span class="pipe-arrow">→</span>
-        <div class="pipe-step"><div class="pipe-dot" style="background:#FFC627;"></div>Actuation</div>
+    <div class="reveal-r">
+      <div class="sys-diagram">
+        <div class="sys-node"><span class="sn-icon">🗺️</span><div><div class="sn-label">SLAM Toolbox</div><div class="sn-detail">async_slam_toolbox · 0.05m/cell</div></div></div>
+        <div class="sys-arrow">↓</div>
+        <div class="sys-node"><span class="sn-icon">🔍</span><div><div class="sn-label">Frontier Explorer</div><div class="sn-detail">Nearest-first wavefront · PoseArray</div></div></div>
+        <div class="sys-arrow">↓</div>
+        <div class="sys-node"><span class="sn-icon">🧠</span><div><div class="sn-label">Behavior Coordinator</div><div class="sn-detail">6-state FSM · proximity lock 3m</div></div></div>
+        <div class="sys-arrow">↓</div>
+        <div class="sys-node"><span class="sn-icon">🚗</span><div><div class="sn-label">Navigation Planner</div><div class="sn-detail">A* costmap · P-controller</div></div></div>
+        <div class="sys-arrow">↓</div>
+        <div class="sys-node"><span class="sn-icon">⚠️</span><div><div class="sn-label">Hazard Classifier</div><div class="sn-detail">DeepHAZMAT + YOLOv5 + LiDAR</div></div></div>
       </div>
     </div>
   </div>
 </section>
 
-<div class="lightbox" id="lightbox" onclick="this.classList.remove('active')">
-  <button class="lightbox-close" onclick="event.stopPropagation();document.getElementById('lightbox').classList.remove('active')">✕</button>
-  <img src="assets/images/architecture.png" alt="Architecture Zoomed"/>
-</div>
-
-<section id="sensors">
-  <div class="container">
-    <div class="fade-in">
-      <div class="section-eyebrow">Hardware</div>
-      <h2 class="section-title">Perception stack & sensor suite</h2>
-      <p class="section-desc">All sensors onboard the TurtleBot4 Lite, their ROS2 topics, and their roles in the system.</p>
+<!-- MILESTONES -->
+<section id="milestones">
+  <div class="section-inner">
+    <div class="reveal">
+      <div class="eyebrow-row"><div class="eyebrow-line"></div><span class="eyebrow-txt">Project Progress</span></div>
+      <h2 class="section-h2">Three milestones.<br/>One complete system.</h2>
+      <p class="section-desc">From architecture proposal to scientific dossier — every deliverable completed across Spring 2026.</p>
     </div>
-    <div class="table-wrap fade-in">
-      <table>
-        <thead><tr><th>Sensor</th><th>Model</th><th>ROS2 Topic</th><th>Purpose</th></tr></thead>
-        <tbody>
-          <tr><td>2D LiDAR</td><td>RPLIDAR A1M8</td><td><span class="topic-badge">/scan</span></td><td>SLAM map building, narrow passage & dead-end detection</td></tr>
-          <tr><td>RGB Camera</td><td>Luxonis OAK-D</td><td><span class="topic-badge">/oakd/rgb/preview/image_raw</span></td><td>Visual hazard classification — fire, water, smoke, debris</td></tr>
-          <tr><td>Stereo Depth</td><td>OAK-D stereo pair</td><td><span class="topic-badge">/oakd/rgb/preview/depth</span></td><td>Pothole and glass wall detection via depth discontinuity</td></tr>
-          <tr><td>IMU</td><td>Create3 built-in ICM-42670</td><td><span class="topic-badge">/imu</span></td><td>Orientation for EKF fusion</td></tr>
-          <tr><td>Cliff Sensors</td><td>Create3 built-in (×4)</td><td><span class="topic-badge">/hazard_detection</span></td><td>Edge and drop-off detection — triggers E-stop</td></tr>
-          <tr><td>Wheel Encoders</td><td>Create3 built-in</td><td><span class="topic-badge">/odom</span></td><td>Primary odometry source for EKF</td></tr>
-        </tbody>
+
+    <!-- TurtleBot SVG animation along progress rail -->
+    <div class="tb-track-wrap reveal">
+      <div class="tb-rail"><div class="tb-fill"></div></div>
+      <div class="tb-anim-track">
+        <svg id="tb-bot" width="56" height="56" viewBox="0 0 56 56">
+          <circle cx="28" cy="28" r="26" fill="rgba(140,29,64,0.1)" stroke="rgba(140,29,64,0.3)" stroke-width="1"/>
+          <circle cx="28" cy="28" r="18" fill="var(--white)" stroke="var(--border)" stroke-width="1.5"/>
+          <circle cx="28" cy="28" r="6" fill="var(--maroon)"/>
+          <rect x="3" y="20" width="7" height="16" rx="3" fill="var(--maroon-dark)"/>
+          <rect x="46" y="20" width="7" height="16" rx="3" fill="var(--maroon-dark)"/>
+          <g stroke="var(--gold)" stroke-width="0.8" opacity="0.5">
+            <line x1="28" y1="28" x2="28" y2="2"/>
+            <line x1="28" y1="28" x2="47" y2="9"/>
+            <line x1="28" y1="28" x2="54" y2="28"/>
+            <line x1="28" y1="28" x2="47" y2="47"/>
+            <line x1="28" y1="28" x2="28" y2="54"/>
+            <line x1="28" y1="28" x2="9" y2="47"/>
+            <line x1="28" y1="28" x2="2" y2="28"/>
+            <line x1="28" y1="28" x2="9" y2="9"/>
+          </g>
+          <polygon points="28,4 24,12 32,12" fill="var(--gold)"/>
+          <!-- success flag at end -->
+        </svg>
+      </div>
+    </div>
+
+    <div class="ms-grid">
+      <div class="ms-card m1 reveal d1">
+        <div class="ms-date">March 6, 2026 · 5% weight</div>
+        <div class="ms-title">Milestone 1</div>
+        <div class="ms-subtitle">Proposal &amp; Architecture</div>
+        <div class="ms-status">Complete</div><br/>
+        <a class="ms-link" href="milestones/milestone1.html">Read Milestone 1 →</a>
+      </div>
+      <div class="ms-card m2 reveal d2">
+        <div class="ms-date">April 15, 2026 · 10% weight</div>
+        <div class="ms-title">Milestone 2</div>
+        <div class="ms-subtitle">Mid-Point Technical Proof</div>
+        <div class="ms-status">Complete</div><br/>
+        <a class="ms-link" href="milestones/milestone2.html">Read Milestone 2 →</a>
+      </div>
+      <div class="ms-card m3 reveal d3">
+        <div class="ms-date">May 8, 2026 · 15% weight</div>
+        <div class="ms-title">Milestone 3</div>
+        <div class="ms-subtitle">Final Scientific Dossier</div>
+        <div class="ms-status">Complete</div><br/>
+        <a class="ms-link" href="milestones/milestone3.html">Read Milestone 3 →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TEAM -->
+<section id="team">
+  <div class="section-inner">
+    <div class="reveal">
+      <div class="eyebrow-row"><div class="eyebrow-line"></div><span class="eyebrow-txt">The Team</span></div>
+      <h2 class="section-h2">Group 1 — ASU RAS 598</h2>
+      <p class="section-desc">Three engineers building autonomous robots from the ground up.</p>
+    </div>
+    <div class="team-grid">
+      <div class="team-card reveal d1">
+        <div class="avatar" style="background:var(--maroon);">P</div>
+        <div class="t-name">Princess Colon</div>
+        <div class="t-email">pcolon@asu.edu</div>
+        <div class="t-role">Navigation &amp; Frontier Planning</div>
+        <div class="t-desc">Built the custom A* navigation planner, frontier explorer with wavefront scoring, behavior coordinator FSM, and costmap. Owns the complete navigation stack and real hardware integration.</div>
+        <div class="t-tags"><span class="tag">A* Planner</span><span class="tag">Frontier Explorer</span><span class="tag">Behavior FSM</span><span class="tag">Launch Files</span></div>
+      </div>
+      <div class="team-card reveal d2">
+        <div class="avatar" style="background:var(--maroon-light);">M</div>
+        <div class="t-name">Manjunath Kondamu</div>
+        <div class="t-email">mkondamu@asu.edu</div>
+        <div class="t-role">Perception, Hazard Detection &amp; Website</div>
+        <div class="t-desc">Built the 5-layer semantic hazard classifier integrating DeepHAZMAT, YOLOv5 fire detection, HSV vision, depth analysis, and LiDAR sector analysis. Designed and built the complete project website (M1–M3). Fixed the Gazebo simulation LiDAR bug (Ogre2 renderer fix).</div>
+        <div class="t-tags"><span class="tag">DeepHAZMAT</span><span class="tag">YOLOv5</span><span class="tag">Hazard Classify</span><span class="tag">Website Design</span></div>
+      </div>
+      <div class="team-card reveal d3">
+        <div class="avatar" style="background:#1a5276;">R</div>
+        <div class="t-name">Rohit Mane</div>
+        <div class="t-email">rmane2@asu.edu</div>
+        <div class="t-role">System Integration &amp; Hardware</div>
+        <div class="t-desc">Authored the mathematical documentation and ethical impact statement. Provided validation support during real robot testing. Contributed to project documentation and reporting.</div>
+        <div class="t-tags"><span class="tag">Math Docs</span><span class="tag">Ethics</span><span class="tag">Documentation</span><span class="tag">Validation</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CODE -->
+<section id="code-sec">
+  <div class="section-inner">
+    <div class="reveal">
+      <div class="eyebrow-row"><div class="eyebrow-line"></div><span class="eyebrow-txt">Source Code</span></div>
+      <h2 class="section-h2">Five custom nodes.<br/>Every line authored.</h2>
+      <p class="section-desc">All code is open source and fully traceable to individual authors via git log.</p>
+    </div>
+    <div class="code-grid">
+      <div class="code-card reveal d1"><div class="file">frontier_explorer_node.py</div><div class="desc">Frontier detection, flood-fill clustering, nearest-first wavefront scoring. score = 1/(dist + ε)</div><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/frontier_explorer_node.py" target="_blank">View on GitHub →</a></div>
+      <div class="code-card reveal d2"><div class="file">navigation_planner.py</div><div class="desc">Custom Nav2 replacement. A* on costmap, swept-corridor pruning, P-controller drive loop.</div><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/navigation_planner.py" target="_blank">View on GitHub →</a></div>
+      <div class="code-card reveal d3"><div class="file">semantic_hazard_classifier_node.py</div><div class="desc">5-layer hazard detection. DeepHAZMAT + YOLOv5 + HSV + depth + LiDAR. Threaded YOLO at 1Hz.</div><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/semantic_hazard_classifier_node.py" target="_blank">View on GitHub →</a></div>
+      <div class="code-card reveal d1"><div class="file">behavior_coordinator_node.py</div><div class="desc">6-state FSM, proximity lock 3.0m, frontier stability, blacklisting, E-stop handling.</div><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/behavior_coordinator_node.py" target="_blank">View on GitHub →</a></div>
+      <div class="code-card reveal d2"><div class="file">scan_relay_node.py</div><div class="desc">Simulation frame_id fix. Republishes /scan→/scan_fixed for SLAM toolbox compatibility.</div><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/frontier_exploration_mapping/scan_relay_node.py" target="_blank">View on GitHub →</a></div>
+      <div class="code-card reveal d3"><div class="file">exploration.launch.py</div><div class="desc">Unified launch: SLAM + all 4 nodes + RViz2. use_sim_time flag for sim/hardware switching.</div><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/blob/main/ros2_ws/src/frontier_exploration_mapping/launch/exploration.launch.py" target="_blank">View on GitHub →</a></div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section id="stats">
+  <div class="section-inner">
+    <div class="reveal">
+      <div class="eyebrow-row"><div class="eyebrow-line" style="background:var(--gold)"></div><span class="eyebrow-txt">GitHub Activity</span></div>
+      <h2 class="section-h2">Built in the open.</h2>
+    </div>
+    <div class="gh-grid reveal" id="gh-grid">
+      <div class="gh-cell"><div class="n" id="s-c">—</div><div class="l">Commits</div></div>
+      <div class="gh-cell"><div class="n" id="s-p">—</div><div class="l">Pull Requests</div></div>
+      <div class="gh-cell"><div class="n" id="s-b">—</div><div class="l">Branches</div></div>
+      <div class="gh-cell"><div class="n" id="s-s">—</div><div class="l">Stars</div></div>
+      <div class="gh-cell"><div class="n" id="s-f">—</div><div class="l">Forks</div></div>
+      <div class="gh-cell"><div class="n" id="s-i">—</div><div class="l">Issues</div></div>
+    </div>
+    <div id="mbars" class="reveal"></div>
+    <div class="commits-wrap reveal">
+      <div class="commits-head">Recent Commits</div>
+      <table class="ctable">
+        <thead><tr><th>SHA</th><th>Author</th><th>Date</th><th>Message</th><th>Download</th></tr></thead>
+        <tbody id="cbody"><tr><td colspan="5" style="text-align:center;padding:22px;color:rgba(255,255,255,0.25);">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
 </section>
 
-<section id="milestones">
-  <div class="container">
-    <div class="fade-in">
-      <div class="section-eyebrow">Timeline</div>
-      <h2 class="section-title">Project milestones</h2>
-      <p class="section-desc">Three milestones across Spring 2026 — from proposal to scientific dossier.</p>
-    </div>
-    <div class="timeline fade-in">
-
-      <div class="timeline-item">
-        <div class="timeline-dot done"></div>
-        <div class="timeline-card">
-          <div class="timeline-header">
-            <div><div class="timeline-title">Milestone 1 — Proposal & Architecture</div><div class="timeline-sub">Mar 6, 2026 · 5% weight · ~1,500 words</div></div>
-            <span class="ms-badge done">✓ Submitted</span>
-          </div>
-          <div class="timeline-body">Complete system proposal — kinematic model, perception stack design, custom node architecture, module declaration table, safety protocols, and Git infrastructure.</div>
-          <div class="timeline-tags"><span class="tag">Differential Drive</span><span class="tag">SLAM Toolbox</span><span class="tag">Nav2</span><span class="tag">EKF</span><span class="tag">Site Setup</span></div>
-          <div class="timeline-meta">
-            <div class="timeline-meta-item"><strong>Due:</strong> Mar 6</div>
-            <div class="timeline-meta-item"><strong>Weight:</strong> 5%</div>
-            <div class="timeline-meta-item"><strong>Status:</strong> Complete</div>
-            <div class="ms-links"><a class="ms-link" href="milestones/milestone1.html">Read proposal →</a></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="timeline-item">
-        <div class="timeline-dot submitted"></div>
-        <div class="timeline-card">
-          <div class="timeline-header">
-            <div><div class="timeline-title">Milestone 2 — Mid-Point Technical Proof</div><div class="timeline-sub">Apr 15, 2026 · 10% weight · 2,500–3,000 words</div></div>
-            <span class="ms-badge submitted">⬆ Submitted</span>
-          </div>
-          <div class="timeline-body">Three custom ROS2 nodes running on TurtleBot4 Lite — frontier explorer, 5-layer semantic hazard classifier with DeepHAZMAT YOLO, and behavior coordinator state machine. Includes rosbag evidence, RQT node graph, demo video, and full mathematical derivations.</div>
-          <div class="timeline-tags">
-            <span class="tag">Frontier Explorer</span><span class="tag">Semantic Classifier</span>
-            <span class="tag">Behavior Coordinator</span><span class="tag">DeepHAZMAT YOLO</span>
-            <span class="tag">ROS Bag</span><span class="tag">Math Derivations</span>
-          </div>
-          <div class="timeline-meta">
-            <div class="timeline-meta-item"><strong>Due:</strong> Apr 15</div>
-            <div class="timeline-meta-item"><strong>Weight:</strong> 10%</div>
-            <div class="timeline-meta-item"><strong>Status:</strong> Submitted</div>
-            <div class="ms-links">
-              <a class="ms-link" href="milestones/milestone2.html">Full write-up →</a>
-              <a class="ms-link gold" href="math/m2-mathematics.html">Math page →</a>
-              <a class="ms-link blue" href="math/mathematics_merged.tex" target="_blank">.tex →</a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="timeline-item">
-        <div class="timeline-dot future"></div>
-        <div class="timeline-card">
-          <div class="timeline-header">
-            <div><div class="timeline-title">Milestone 3 — Final Documentation & Analysis</div><div class="timeline-sub">May 6, 2026 · 15% weight · 3,000–3,500 words</div></div>
-            <span class="ms-badge future">Upcoming</span>
-          </div>
-          <div class="timeline-body">Scientific Dossier — full hardware validation in disaster scenario, HAZMAT detection on robot camera, semantic accuracy confusion matrix, performance benchmarking, and ethical evaluation.</div>
-          <div class="timeline-tags"><span class="tag">Hardware Demo</span><span class="tag">HAZMAT on Robot</span><span class="tag">Confusion Matrix</span><span class="tag">Benchmarks</span><span class="tag">Ethics</span></div>
-          <div class="timeline-meta">
-            <div class="timeline-meta-item"><strong>Due:</strong> May 6</div>
-            <div class="timeline-meta-item"><strong>Weight:</strong> 15%</div>
-            <div class="timeline-meta-item"><strong>Status:</strong> Upcoming</div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</section>
-
-<section id="team">
-  <div class="container">
-    <div class="fade-in">
-      <div class="section-eyebrow">Team</div>
-      <h2 class="section-title">Meet the team</h2>
-      <p class="section-desc">Three graduate students from Arizona State University, Spring 2026.</p>
-    </div>
-    <div class="team-grid fade-in">
-      <div class="team-card">
-        <div class="team-avatar av-a">PC</div>
-        <div class="team-name">Princess Colon</div>
-        <div class="team-role">Frontier Exploration Lead</div>
-        <div class="team-person">@PriColon</div>
-        <ul class="team-tasks">
-          <li>frontier_explorer_node.py</li>
-          <li>SLAM on TurtleBot4 Lite hardware</li>
-          <li>ROS bag recording & demo video</li>
-          <li>RViz2 config & system diagram</li>
-        </ul>
-      </div>
-      <div class="team-card">
-        <div class="team-avatar av-b">RM</div>
-        <div class="team-name">Rohit Mane</div>
-        <div class="team-role">Mathematical Foundations</div>
-        <div class="team-person">@rmane2</div>
-        <ul class="team-tasks">
-          <li>Kinematics & frontier scoring</li>
-          <li>EKF prediction & update equations</li>
-          <li>SLAM Bayes update derivation</li>
-          <li>DWA planner math</li>
-        </ul>
-      </div>
-      <div class="team-card">
-        <div class="team-avatar av-c">MK</div>
-        <div class="team-name">Manjunath Kondamu</div>
-        <div class="team-role">Hazard Mapping & Integration</div>
-        <div class="team-person">@Mkondamu</div>
-        <ul class="team-tasks">
-          <li>semantic_hazard_classifier_node.py</li>
-          <li>behavior_coordinator_node.py</li>
-          <li>DeepHAZMAT YOLO integration</li>
-          <li>exploration.launch.py & site</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="stats">
-  <div class="container">
-    <div class="fade-in">
-      <div class="section-eyebrow">Repository</div>
-      <h2 class="section-title">Live GitHub stats</h2>
-      <p class="section-desc">Real-time data from the project repository — updates on every page load.</p>
-    </div>
-    <div id="stats-loading" style="text-align:center;color:var(--text-muted);font-size:13px;padding:40px 0;">Loading repository data...</div>
-    <div id="stats-content" style="display:none;">
-      <div class="stats-cards fade-in" id="stat-cards"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:32px;" class="fade-in">
-        <div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">Commits per member</div><div id="member-bars"></div></div>
-        <div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">Pull requests per member</div><div id="pr-bars"></div></div>
-      </div>
-      <div class="fade-in">
-        <div class="commits-header">
-          <span>Recent commits</span>
-          <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration/commits/main" target="_blank">View all on GitHub →</a>
-        </div>
-        <div class="commits-table-wrap">
-          <table>
-            <thead><tr><th>Commit</th><th>Author</th><th>Date</th><th>Message</th><th>Download</th></tr></thead>
-            <tbody id="commits-body"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="progress">
-  <div class="container">
-    <div class="fade-in">
-      <div class="section-eyebrow">Project Progress</div>
-      <h2 class="section-title">Gantt chart & task tracker</h2>
-      <p class="section-desc">Live view from our Google Sheets Gantt chart — updates automatically as we make progress.</p>
-    </div>
-    <div class="gantt-embed-wrap fade-in">
-      <div class="gantt-embed-header">
-        <span>📊 Gantt Chart — Autonomous Frontier Exploration</span>
-        <a href="https://docs.google.com/spreadsheets/d/1-BaDCQLcH520J44vLizVBs9r2exwKmMxTH-RsXT442M/edit" target="_blank">Open in Google Sheets ↗</a>
-      </div>
-      <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4ZZ3Wum-JCZ_I3EpO6ndhOG2HKHcmVtO56RMFLcNY2mnsDGQHdXAEMk4dbk2hsJDvrphdxLZZKRWd/pubhtml?gid=90674400&single=true&widget=true&headers=false" frameborder="0" allowfullscreen></iframe>
-    </div>
-  </div>
-</section>
-
+<!-- FOOTER -->
 <footer>
-  <div class="footer-logo">Autonomous Frontier Exploration</div>
-  <div class="footer-sub">RAS 598: Mobile Robotics · Arizona State University · Spring 2026</div>
-  <div class="footer-links">
-    <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank">GitHub</a>
-    <a href="milestones/milestone1.html">Milestone 1</a>
-    <a href="milestones/milestone2.html">Milestone 2</a>
-    <a href="milestones/milestone3.html">Milestone 3</a>
-    <a href="math/m2-mathematics.html">Mathematics</a>
-    <a href="math/mathematics_merged.tex" target="_blank">LaTeX (.tex)</a>
-    <a href="https://ras-mobile-robotics.github.io/project/m2.html" target="_blank">Course Site</a>
+  <div class="footer-inner">
+    <div class="f-brand"><div class="logo">Autonomous Frontier Exploration</div><p>An autonomous ground robot that explores unknown environments and maps semantic hazards in real time. Built for RAS 598 Mobile Robotics at Arizona State University.</p></div>
+    <div class="f-col"><h4>Milestones</h4><a href="milestones/milestone1.html">Milestone 1 — Proposal</a><a href="milestones/milestone2.html">Milestone 2 — Technical Proof</a><a href="milestones/milestone3.html">Milestone 3 — Final Dossier</a><a href="report.html">Full Project Report</a></div>
+    <div class="f-col"><h4>Links</h4><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank">GitHub Repository ↗</a><a href="#team">Meet the Team</a><a href="#stats">Project Stats</a></div>
   </div>
+  <div class="f-bottom"><span>RAS 598 Mobile Robotics · Arizona State University · Spring 2026 · Group 1</span><span>Princess Colon · Manjunath Kondamu · Rohit Mane</span></div>
 </footer>
 
 <script>
-const obs=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting)x.target.classList.add('visible');});},{threshold:0.1});
-document.querySelectorAll('.fade-in').forEach(el=>obs.observe(el));
-const sections=document.querySelectorAll('section[id]');
+// ── GOLD CURSOR ──
+const gCur=document.getElementById('g-cur'),gRing=document.getElementById('g-ring');
+let gx=0,gy=0,grx=0,gry=0;
+document.addEventListener('mousemove',e=>{gx=e.clientX;gy=e.clientY;gCur.style.left=gx+'px';gCur.style.top=gy+'px';});
+(function animGRing(){grx+=(gx-grx)*0.12;gry+=(gy-gry)*0.12;gRing.style.left=grx+'px';gRing.style.top=gry+'px';requestAnimationFrame(animGRing);})();
+document.querySelectorAll('a,button').forEach(el=>{el.addEventListener('mouseenter',()=>document.body.classList.add('link-hover'));el.addEventListener('mouseleave',()=>document.body.classList.remove('link-hover'));});
+
+// ── TURTLEBOT CURSOR (1.5s lag) ──
+const tbCursor=document.getElementById('tb-cursor');
+let tbX=0,tbY=0,tbCurX=0,tbCurY=0,tbPrevX=0,tbPrevY=0;
+document.addEventListener('mousemove',e=>{tbX=e.clientX;tbY=e.clientY;});
+(function animTb(){
+  tbCurX+=(tbX-tbCurX)*0.02;
+  tbCurY+=(tbY-tbCurY)*0.02;
+  tbCursor.style.left=tbCurX+'px';
+  tbCursor.style.top=tbCurY+'px';
+  const dx=tbX-tbPrevX,dy=tbY-tbPrevY;
+  if(Math.abs(dx)>0.3||Math.abs(dy)>0.3){
+    const angle=Math.atan2(dy,dx)*180/Math.PI+90;
+    tbCursor.style.transform=`translate(-50%,-50%) rotate(${angle}deg)`;
+  }
+  tbPrevX+=(tbX-tbPrevX)*0.015;
+  tbPrevY+=(tbY-tbPrevY)*0.015;
+  requestAnimationFrame(animTb);
+})();
+
+// ── NAV SCROLL ──
+const nav=document.getElementById('nav');
 window.addEventListener('scroll',()=>{
-  let cur='';
-  sections.forEach(s=>{if(window.scrollY>=s.offsetTop-80)cur=s.id;});
-  document.querySelectorAll('.nav-links > li > a').forEach(a=>{
-    a.style.color=(a.getAttribute('href')==='#'+cur)?'var(--gold)':'rgba(255,255,255,0.75)';
-  });
+  nav.className=window.scrollY>60?'scrolled':'top';
 },{passive:true});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('lightbox').classList.remove('active');});
+
+// ── HERO CANVAS — ASU maroon + gold radar ──
+const cv=document.getElementById('hero-canvas'),ctx=cv.getContext('2d');
+let W,H,t=0,hmx=500,hmy=400;
+function resize(){W=cv.width=cv.offsetWidth;H=cv.height=cv.offsetHeight;}
+cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();hmx=e.clientX-r.left;hmy=e.clientY-r.top;});
+function draw(){
+  ctx.clearRect(0,0,W,H);t+=0.005;
+  // Grid
+  ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  // Pulse dots near mouse
+  for(let x=0;x<W;x+=50){for(let y=0;y<H;y+=50){
+    const d=Math.hypot(x-hmx,y-hmy);
+    const inf=Math.max(0,1-d/180);
+    if(inf>0){ctx.beginPath();ctx.arc(x,y,1+inf*3,0,Math.PI*2);ctx.fillStyle=`rgba(255,198,39,${0.08+inf*0.4})`;ctx.fill();}
+    else{ctx.beginPath();ctx.arc(x,y,1,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.06)';ctx.fill();}
+  }}
+  // Radar at top-right
+  const rx=W*0.82,ry=H*0.38,maxR=Math.min(W,H)*0.32;
+  for(let r=maxR*0.25;r<=maxR;r+=maxR*0.25){
+    ctx.beginPath();ctx.arc(rx,ry,r,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,198,39,0.07)';ctx.lineWidth=1;ctx.stroke();
+  }
+  ctx.save();ctx.translate(rx,ry);ctx.rotate(t*1.5);
+  const g=ctx.createLinearGradient(0,0,maxR,0);
+  g.addColorStop(0,'rgba(255,198,39,0.25)');g.addColorStop(1,'rgba(255,198,39,0)');
+  ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,maxR,-0.35,0);ctx.closePath();
+  ctx.fillStyle=g;ctx.fill();ctx.restore();
+  ctx.beginPath();ctx.arc(rx,ry,4,0,Math.PI*2);ctx.fillStyle='rgba(255,198,39,0.7)';ctx.fill();
+  requestAnimationFrame(draw);
+}
+resize();draw();window.addEventListener('resize',resize);
+
+// ── SCROLL REVEAL ──
+const obs=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting)x.target.classList.add('visible');});},{threshold:0.08,rootMargin:'0px 0px -50px 0px'});
+document.querySelectorAll('.reveal,.reveal-l,.reveal-r').forEach(el=>obs.observe(el));
+
+// ── TURTLEBOT ANIMATION ──
+setTimeout(()=>{
+  const bot=document.getElementById('tb-bot');
+  if(!bot)return;
+  const track=bot.parentElement;
+  let pos=0,dir=1,maxPos=track.offsetWidth-56;
+  setInterval(()=>{
+    maxPos=track.offsetWidth-56;
+    pos+=dir*0.6;
+    if(pos>=maxPos){dir=-1;bot.style.transform='scaleX(-1)';}
+    if(pos<=0){dir=1;bot.style.transform='scaleX(1)';}
+    bot.style.left=pos+'px';
+  },16);
+},800);
+
+// ── GITHUB ──
 const REPO='PriColon/mobile-robotics-frontier-exploration';
-const MEMBERS=[
-  {name:'Princess Colon',login:'PriColon',color:'#8C1D40'},
-  {name:'Rohit Mane',login:'rmane2',color:'#1a5276'},
-  {name:'Manjunath K.',login:'Mkondamu',color:'#145a32'},
-];
-async function loadStats(){
+const MEMBERS=[{name:'Princess Colon',login:'PriColon',color:'#FFC627'},{name:'Rohit Mane',login:'rmane2',color:'#64DFDF'},{name:'Manjunath K.',login:'Mkondamu',color:'#FF6B6B'}];
+async function loadGH(){
   try{
-    const [repo,commits,branches,prs]=await Promise.all([
+    const[repo,commits,branches,prs]=await Promise.all([
       fetch(`https://api.github.com/repos/${REPO}`).then(r=>r.json()),
       fetch(`https://api.github.com/repos/${REPO}/commits?per_page=50`).then(r=>r.json()),
       fetch(`https://api.github.com/repos/${REPO}/branches`).then(r=>r.json()),
       fetch(`https://api.github.com/repos/${REPO}/pulls?state=all&per_page=100`).then(r=>r.json()),
     ]);
-    document.getElementById('stats-loading').style.display='none';
-    document.getElementById('stats-content').style.display='block';
-    const cards=[
-      {n:Array.isArray(commits)?commits.length:0,l:'Total Commits'},
-      {n:Array.isArray(prs)?prs.length:0,l:'Pull Requests'},
-      {n:Array.isArray(branches)?branches.length:0,l:'Branches'},
-      {n:repo.stargazers_count||0,l:'Stars'},
-      {n:repo.forks_count||0,l:'Forks'},
-      {n:repo.open_issues_count||0,l:'Issues'},
-    ];
-    document.getElementById('stat-cards').innerHTML=cards.map(c=>`<div class="stats-card"><div class="s-num">${c.n}</div><div class="s-label">${c.l}</div></div>`).join('');
-    const cc={},pc={};
-    MEMBERS.forEach(m=>{cc[m.login.toLowerCase()]=0;pc[m.login.toLowerCase()]=0;});
+    document.getElementById('s-c').textContent=Array.isArray(commits)?commits.length:0;
+    document.getElementById('s-p').textContent=Array.isArray(prs)?prs.length:0;
+    document.getElementById('s-b').textContent=Array.isArray(branches)?branches.length:0;
+    document.getElementById('s-s').textContent=repo.stargazers_count||0;
+    document.getElementById('s-f').textContent=repo.forks_count||0;
+    document.getElementById('s-i').textContent=repo.open_issues_count||0;
+    const cc={};MEMBERS.forEach(m=>cc[m.login.toLowerCase()]=0);
     (Array.isArray(commits)?commits:[]).forEach(c=>{if(c.author?.login){const l=c.author.login.toLowerCase();if(cc[l]!==undefined)cc[l]++;}});
-    (Array.isArray(prs)?prs:[]).forEach(p=>{if(p.user?.login){const l=p.user.login.toLowerCase();if(pc[l]!==undefined)pc[l]++;}});
     const maxC=Math.max(...Object.values(cc),1);
-    const maxP=Math.max(...Object.values(pc),1);
-    document.getElementById('member-bars').innerHTML=MEMBERS.map(m=>{const c=cc[m.login.toLowerCase()]||0;return `<div class="member-bar-row"><div class="member-bar-label">${m.name}</div><div class="member-bar-track"><div class="member-bar-fill" style="width:${Math.round(c/maxC*100)}%;background:${m.color};"></div></div><div class="member-bar-count">${c}</div></div>`;}).join('');
-    document.getElementById('pr-bars').innerHTML=MEMBERS.map(m=>{const p=pc[m.login.toLowerCase()]||0;return `<div class="member-bar-row"><div class="member-bar-label">${m.name}</div><div class="member-bar-track"><div class="member-bar-fill" style="width:${Math.round(p/maxP*100)}%;background:${m.color};"></div></div><div class="member-bar-count">${p}</div></div>`;}).join('');
-    document.getElementById('commits-body').innerHTML=(Array.isArray(commits)?commits:[]).slice(0,30).map(c=>{
-      const sha=c.sha.substring(0,7);
-      const author=c.author?.login||c.commit?.author?.name||'—';
-      const msg=(c.commit?.message||'').split('\n')[0].substring(0,55);
-      const date=new Date(c.commit?.author?.date).toLocaleDateString();
-      return `<tr><td class="commit-sha"><a href="${c.html_url}" target="_blank">${sha}</a></td><td style="font-size:12px;">${author}</td><td style="font-size:12px;color:var(--text-muted);">${date}</td><td style="font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${msg}</td><td><a class="dl-btn dl-zip" href="https://github.com/${REPO}/archive/${c.sha}.zip">⬇ zip</a><a class="dl-btn dl-tar" href="https://github.com/${REPO}/archive/${c.sha}.tar.gz">⬇ tar</a></td></tr>`;
+    const icons=['🤖','🛠️','👁️'];
+document.getElementById('mbars').innerHTML=`<h4 style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:18px;">Commits by member</h4>${MEMBERS.map((m,i)=>{const c=cc[m.login.toLowerCase()]||0;return`<div class="bar-row" style="margin-bottom:18px;"><div class="bar-label" style="display:flex;align-items:center;gap:8px;">${icons[i]}<span>${m.name}</span></div><div class="bar-track" style="height:10px;border-radius:6px;background:rgba(255,255,255,0.06);flex:1;overflow:hidden;position:relative;"><div style="height:100%;border-radius:6px;background:linear-gradient(90deg,${m.color},${m.color}aa);width:${Math.round(c/maxC*100)}%;transition:width 1.5s ease;position:relative;"><span style="position:absolute;right:6px;top:-1px;font-size:9px;opacity:0.7;">◈◈◈</span></div></div><div class="bar-count" style="min-width:28px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:${m.color};">${c}</div></div>`;}).join('')}`;
+    document.getElementById('cbody').innerHTML=(Array.isArray(commits)?commits:[]).slice(0,20).map(c=>{
+      const sha=c.sha.substring(0,7),author=c.author?.login||c.commit?.author?.name||'—',msg=(c.commit?.message||'').split('\n')[0].substring(0,60),date=new Date(c.commit?.author?.date).toLocaleDateString();
+      return`<tr><td><a class="sha" href="${c.html_url}" target="_blank">${sha}</a></td><td>${author}</td><td style="color:rgba(255,255,255,0.3);">${date}</td><td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${msg}</td><td><a class="dl-btn" href="https://github.com/${REPO}/archive/${c.sha}.zip">zip</a></td></tr>`;
     }).join('');
-  }catch(e){document.getElementById('stats-loading').textContent='Could not load — GitHub API rate limit or network issue.';}
+  }catch(e){console.error('GH API:',e);}
 }
-loadStats();
+loadGH();
 </script>
 </body>
 </html>

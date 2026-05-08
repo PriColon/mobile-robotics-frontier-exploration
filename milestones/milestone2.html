@@ -5,6 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Milestone 2 — Frontier Exploration with Semantic Hazard Mapping</title>
   <style>
+  /* ── TOP NAV ── */
+  .top-nav{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(140,29,64,0.97);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,198,39,0.2);padding:0 3rem;height:64px;display:flex;align-items:center;justify-content:space-between;}
+  .tn-brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
+  .tn-logo{width:34px;height:34px;background:#FFC627;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:#6B1530;}
+  .tn-title{font-size:16px;font-weight:600;color:rgba(255,255,255,0.92);}
+  .tn-links{display:flex;list-style:none;align-items:center;}
+  .tn-links>li>a{display:block;padding:0 16px;height:64px;line-height:64px;font-size:16px;font-weight:600;color:rgba(255,255,255,0.8);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;transition:color 0.2s;}
+  .tn-links>li>a:hover{color:#FFC627;}
+  .tn-dropdown{position:relative;}
+  .tn-dropdown-menu{display:none;position:absolute;top:64px;left:0;background:rgba(107,21,48,0.99);backdrop-filter:blur(16px);border:1px solid rgba(255,198,39,0.15);border-top:2px solid #FFC627;border-radius:0 0 10px 10px;min-width:240px;z-index:200;box-shadow:0 16px 32px rgba(0,0,0,0.3);}
+  .tn-dropdown:hover .tn-dropdown-menu{display:block;}
+  .tn-dropdown-menu a{display:block;padding:12px 20px;font-size:16px;color:rgba(255,255,255,0.75);text-decoration:none;transition:all 0.15s;border-bottom:1px solid rgba(255,255,255,0.05);}
+  .tn-dropdown-menu a:last-child{border-bottom:none;}
+  .tn-dropdown-menu a:hover{background:rgba(255,198,39,0.08);color:#FFC627;padding-left:26px;}
+
     :root {
       --maroon: #8C1D40;
       --gold:   #FFC627;
@@ -15,12 +30,21 @@
       --card:   #ffffff;
       --border: #e0e0e0;
     }
+  /* ── ROS node/topic graph background ── */
+  body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+    background-image:
+      radial-gradient(circle, rgba(140,29,64,0.08) 2px, transparent 2px),
+      linear-gradient(rgba(140,29,64,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(140,29,64,0.03) 1px, transparent 1px);
+    background-size: 64px 64px, 64px 64px, 64px 64px;
+    opacity: 0.7; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Segoe UI', Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.7;
+      font-size: 17px;
     }
 
     /* ── Header ── */
@@ -37,7 +61,7 @@
       gap: 16px;
     }
     .header-top span { color: var(--gold); font-size: 13px; font-weight: 600; letter-spacing: 1px; }
-    .header-body { padding: 48px 40px 40px; max-width: 1100px; margin: 0 auto; }
+    .header-body { padding: 80px 6rem 40px; max-width: 1400px; margin: 0 auto; }
     .header-body h1 { font-size: 2.2rem; font-weight: 700; margin-bottom: 8px; }
     .header-body .sub { color: rgba(255,255,255,0.8); font-size: 1rem; }
     .meta-pills { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
@@ -52,7 +76,7 @@
     }
 
     /* ── Layout ── */
-    .page { max-width: 1100px; margin: 0 auto; padding: 40px; }
+    .page { max-width: 1400px; margin: 0 auto; padding: 40px 6rem; }
     .two-col { display: grid; grid-template-columns: 260px 1fr; gap: 40px; align-items: start; }
 
     /* ── Sidebar TOC ── */
@@ -64,19 +88,19 @@
       border-radius: 10px;
       padding: 24px;
     }
-    .toc h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
+    .toc h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
     .toc a {
       display: block;
       padding: 6px 0;
       color: var(--text);
       text-decoration: none;
-      font-size: 14px;
+      font-size:16px;
       border-left: 2px solid transparent;
       padding-left: 10px;
       transition: all 0.2s;
     }
     .toc a:hover { border-left-color: var(--maroon); color: var(--maroon); }
-    .toc a.sub { padding-left: 22px; font-size: 13px; color: var(--muted); }
+    .toc a.sub { padding-left: 22px; font-size:14px; color: var(--muted); }
 
     /* ── Content ── */
     .content section { margin-bottom: 56px; }
@@ -108,7 +132,7 @@
       border-radius: 0 8px 8px 0;
       padding: 16px 20px;
       margin: 16px 0;
-      font-size: 14px;
+      font-size:16px;
     }
     .evidence strong { color: var(--maroon); }
 
@@ -166,7 +190,7 @@
       width: 100%;
       border-collapse: collapse;
       margin: 16px 0;
-      font-size: 14px;
+      font-size:16px;
     }
     th {
       background: var(--maroon);
@@ -220,7 +244,7 @@
       top: 50%;
       transform: translateY(-50%);
       color: #999;
-      font-size: 16px;
+      font-size:18px;
       z-index: 1;
     }
 
@@ -252,7 +276,7 @@
       font-size: 12px;
       flex-shrink: 0;
     }
-    .pdf-link span { font-size: 14px; font-weight: 500; }
+    .pdf-link span { font-size:16px; font-weight: 500; }
 
     /* ── Progress bar ── */
     .progress-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
@@ -278,9 +302,47 @@
       .card-grid { grid-template-columns: 1fr; }
       .page { padding: 20px; }
     }
-  </style>
+
+  /* ── LIGHTBOX / IMAGE ZOOM ── */
+  .img-zoom { cursor: zoom-in; transition: transform 0.2s; }
+  .img-zoom:hover { transform: scale(1.01); }
+  .lb { display: none; position: fixed; inset: 0; background: rgba(10,8,6,0.92); z-index: 9999; align-items: center; justify-content: center; cursor: zoom-out; }
+  .lb.active { display: flex; }
+  .lb img { max-width: 92vw; max-height: 88vh; border-radius: 8px; }
+  .lb-close { position: fixed; top: 20px; right: 28px; color: white; font-size: 24px; cursor: pointer; background: rgba(255,255,255,0.1); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; }
+
+  /* ── Gold cursor ── */
+body{cursor:none;}
+#g-cur{position:fixed;width:10px;height:10px;background:#FFC627;border-radius:50%;pointer-events:none;z-index:99999;transform:translate(-50%,-50%);transition:transform 0.15s;}
+#g-ring{position:fixed;width:28px;height:28px;border:1.5px solid rgba(255,198,39,0.55);border-radius:50%;pointer-events:none;z-index:99998;transform:translate(-50%,-50%);}
+.lhover #g-cur{transform:translate(-50%,-50%) scale(2.2);background:rgba(255,198,39,0.5);}
+.lhover #g-ring{transform:translate(-50%,-50%) scale(0.7);border-color:#FFC627;}
+@media(max-width:960px){body{cursor:auto;}#g-cur,#g-ring{display:none;}}
+</style>
 </head>
 <body>
+<div id="g-cur"></div>
+<div id="g-ring"></div>
+<div class="lb" id="lb2"><button class="lb-close" onclick="document.getElementById('lb2').classList.remove('active')">✕</button><img id="lb2-img" src="" alt=""/></div>
+<nav class="top-nav">
+  <a class="tn-brand" href="../index.html">
+    <div class="tn-logo">AFE</div>
+    <span class="tn-title">Autonomous Frontier Exploration</span>
+  </a>
+  <ul class="tn-links">
+    <li><a href="../index.html">Home</a></li>
+    <li class="tn-dropdown">
+      <a href="#">Milestones ▾</a>
+      <div class="tn-dropdown-menu">
+        <a href="milestone1.html">Milestone 1 — Proposal</a>
+        <a href="milestone2.html" style="color:#FFC627;">Milestone 2 — Technical Proof ✦</a>
+        <a href="milestone3.html">Milestone 3 — Final Dossier</a>
+      </div>
+    </li>
+    <li><a href="../report/report.html">Report</a></li>
+    <li><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank" style="color:#FFC627;">GitHub ↗</a></li>
+  </ul>
+</nav>
 
 <!-- Header -->
 <header>
@@ -347,7 +409,7 @@
         <div class="card-grid">
           <div class="card">
             <h4>What we built</h4>
-            <ul style="padding-left:18px; font-size:14px; line-height:2">
+            <ul style="padding-left:18px; font-size:16px; line-height:2">
               <li><code>frontier_explorer_node.py</code></li>
               <li><code>semantic_hazard_classifier_node.py</code></li>
               <li><code>behavior_coordinator_node.py</code></li>
@@ -357,7 +419,7 @@
           </div>
           <div class="card">
             <h4>Evidence provided</h4>
-            <ul style="padding-left:18px; font-size:14px; line-height:2">
+            <ul style="padding-left:18px; font-size:16px; line-height:2">
               <li>Demo video — frontier exploration</li>
               <li>RQT node graph — live system</li>
               <li>ROS bag — full sensor recording</li>
@@ -380,7 +442,7 @@
 
         <div class="img-block">
           <figure>
-            <img src="../assets/images/mermaid_milestone2.png"
+            <img class="img-zoom" onclick="openLb2(this.src)" src="../assets/images/mermaid_milestone2.png"
                  alt="System architecture Mermaid diagram showing node connections"/>
             <figcaption>Figure 1 — Full system node graph generated from the running ROS2 stack</figcaption>
           </figure>
@@ -388,7 +450,7 @@
 
         <div class="img-block">
           <figure>
-            <img src="../assets/images/rqt_graph_active_Milestone2.png"
+            <img class="img-zoom" onclick="openLb2(this.src)" src="../assets/images/rqt_graph_active_Milestone2.png"
                  alt="RQT graph showing active nodes and topic connections"/>
             <figcaption>Figure 2 — RQT graph captured during live frontier exploration run on TurtleBot4 Lite</figcaption>
           </figure>
@@ -414,7 +476,7 @@
 
         <div class="card">
           <h4>Frontier Detection Pipeline</h4>
-          <ol style="padding-left:20px; font-size:14px; line-height:2.2">
+          <ol style="padding-left:20px; font-size:16px; line-height:2.2">
             <li><strong>Cell scanning</strong> — iterate all free cells (value=0) in the OccupancyGrid</li>
             <li><strong>Frontier test</strong> — a free cell is a frontier if its 3×3 kernel contains at least one unknown cell (value=−1) and no occupied cells (value=100)</li>
             <li><strong>Clustering</strong> — connected frontier cells are grouped using <code>scipy.ndimage.label()</code> with a 3×3 structure element; clusters smaller than <code>min_cluster_size=10</code> are discarded as noise</li>
@@ -592,19 +654,19 @@
         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px; margin: 16px 0;">
           <div class="img-block">
             <figure>
-              <img src="../assets/images/ss2.png" alt="DeepHAZMAT detection screenshot 1"/>
+              <img class="img-zoom" onclick="openLb2(this.src)" src="../assets/images/ss2.png" alt="DeepHAZMAT detection screenshot 1"/>
               <figcaption>HAZMAT sign detected — bounding box with class label</figcaption>
             </figure>
           </div>
           <div class="img-block">
             <figure>
-              <img src="../assets/images/ss3.png" alt="DeepHAZMAT detection screenshot 2"/>
+              <img class="img-zoom" onclick="openLb2(this.src)" src="../assets/images/ss3.png" alt="DeepHAZMAT detection screenshot 2"/>
               <figcaption>Multi-class HAZMAT detection output</figcaption>
             </figure>
           </div>
           <div class="img-block">
             <figure>
-              <img src="../assets/images/ss4.png" alt="DeepHAZMAT detection screenshot 3"/>
+              <img class="img-zoom" onclick="openLb2(this.src)" src="../assets/images/ss4.png" alt="DeepHAZMAT detection screenshot 3"/>
               <figcaption>GrabCut segmentation on detected HAZMAT region</figcaption>
             </figure>
           </div>
@@ -612,7 +674,7 @@
 
         <h3>Outputs</h3>
         <p>The classifier publishes to three topics simultaneously:</p>
-        <ul style="padding-left:20px; font-size:14px; line-height:2.2; margin-bottom:14px">
+        <ul style="padding-left:20px; font-size:16px; line-height:2.2; margin-bottom:14px">
           <li><code>/semantic_map</code> — OccupancyGrid where cell values encode hazard severity (0=CLEAR, 30=DEBRIS, 85=HAZMAT, 100=FIRE/CLIFF)</li>
           <li><code>/hazard_alert</code> — String with current highest-priority hazard name</li>
           <li><code>/hazard_markers</code> — MarkerArray of colored 3D cubes for RViz2 visualization</li>
@@ -712,7 +774,7 @@
 
         <div class="card">
           <h4>Launch sequence</h4>
-          <ol style="padding-left:20px; font-size:14px; line-height:2.2">
+          <ol style="padding-left:20px; font-size:16px; line-height:2.2">
             <li><strong>slam_toolbox</strong> — async SLAM in mapping mode (resolution 0.05 m)</li>
             <li><strong>robot_localization EKF</strong> — fuses wheel odometry + IMU → <code>/odometry/filtered</code></li>
             <li><strong>Nav2</strong> — costmap, path planner (NavFn), DWA local controller</li>
@@ -846,6 +908,12 @@
 
     </main>
   </div>
+
+    <!-- BOTTOM PAGE NAV -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:56px;padding-top:24px;border-top:1px solid var(--border);">
+      <a href="milestone1.html" style="display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--maroon);text-decoration:none;padding:10px 20px;border:1.5px solid rgba(140,29,64,0.2);border-radius:10px;transition:all 0.2s;">← Milestone 1</a>
+      <a href="milestone3.html" style="display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--maroon);text-decoration:none;padding:10px 20px;border:1.5px solid rgba(140,29,64,0.2);border-radius:10px;transition:all 0.2s;">Milestone 3 →</a>
+    </div>
 </div>
 
 <footer>
@@ -854,5 +922,21 @@
   </p>
 </footer>
 
+
+<script>
+function openLb2(src){document.getElementById('lb2-img').src=src;document.getElementById('lb2').classList.add('active');}
+document.getElementById('lb2').addEventListener('click',function(e){if(e.target===this)this.classList.remove('active');});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')document.getElementById('lb2').classList.remove('active');});
+</script>
+<script>
+(function(){
+  const gc=document.getElementById('g-cur'),gr=document.getElementById('g-ring');
+  if(!gc)return;
+  let gx=0,gy=0,rx=0,ry=0;
+  document.addEventListener('mousemove',e=>{gx=e.clientX;gy=e.clientY;gc.style.left=gx+'px';gc.style.top=gy+'px';});
+  (function a(){rx+=(gx-rx)*0.12;ry+=(gy-ry)*0.12;gr.style.left=rx+'px';gr.style.top=ry+'px';requestAnimationFrame(a);})();
+  document.querySelectorAll('a,button').forEach(el=>{el.addEventListener('mouseenter',()=>document.body.classList.add('lhover'));el.addEventListener('mouseleave',()=>document.body.classList.remove('lhover'));});
+})();
+</script>
 </body>
 </html>
