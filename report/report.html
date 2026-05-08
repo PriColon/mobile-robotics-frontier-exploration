@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Full Project Report — AFE · ASU RAS 598</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+
+  /* ── TOP NAV ── */
+  .top-nav{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(140,29,64,0.97);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,198,39,0.2);padding:0 3rem;height:64px;display:flex;align-items:center;justify-content:space-between;}
+  .tn-brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
+  .tn-logo{width:34px;height:34px;background:#FFC627;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:#6B1530;}
+  .tn-title{font-size:16px;font-weight:600;color:rgba(255,255,255,0.92);}
+  .tn-links{display:flex;list-style:none;align-items:center;}
+  .tn-links>li>a{display:block;padding:0 16px;height:64px;line-height:64px;font-size:16px;font-weight:600;color:rgba(255,255,255,0.8);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;transition:color 0.2s;}
+  .tn-links>li>a:hover{color:#FFC627;}
+  .tn-dropdown{position:relative;}
+  .tn-dropdown-menu{display:none;position:absolute;top:64px;left:0;background:rgba(107,21,48,0.99);backdrop-filter:blur(16px);border:1px solid rgba(255,198,39,0.15);border-top:2px solid #FFC627;border-radius:0 0 10px 10px;min-width:240px;z-index:200;box-shadow:0 16px 32px rgba(0,0,0,0.3);}
+  .tn-dropdown:hover .tn-dropdown-menu{display:block;}
+  .tn-dropdown-menu a{display:block;padding:12px 20px;font-size:16px;color:rgba(255,255,255,0.75);text-decoration:none;transition:all 0.15s;border-bottom:1px solid rgba(255,255,255,0.05);}
+  .tn-dropdown-menu a:last-child{border-bottom:none;}
+  .tn-dropdown-menu a:hover{background:rgba(255,198,39,0.08);color:#FFC627;padding-left:26px;}
+
+    :root {
+      --maroon: #8C1D40;
+      --gold:   #FFC627;
+      --dark:   #1a1a1a;
+      --text:   #2c2c2c;
+      --muted:  #666;
+      --bg:     #f9f9f9;
+      --card:   #ffffff;
+      --border: #e0e0e0;
+    }
+  /* ── ROS node/topic graph background ── */
+  body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+    background-image:
+      radial-gradient(circle, rgba(140,29,64,0.08) 2px, transparent 2px),
+      linear-gradient(rgba(140,29,64,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(140,29,64,0.03) 1px, transparent 1px);
+    background-size: 64px 64px, 64px 64px, 64px 64px;
+    opacity: 0.7; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 17px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--maroon);
+      color: white;
+      padding: 0;
+    }
+    .header-top {
+      background: var(--dark);
+      padding: 10px 40px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-top span { color: var(--gold); font-size: 13px; font-weight: 600; letter-spacing: 1px; }
+    .header-body { padding: 80px 6rem 40px; max-width: 1400px; margin: 0 auto; }
+    .header-body h1 { font-size: 2.2rem; font-weight: 700; margin-bottom: 8px; }
+    .header-body .sub { color: rgba(255,255,255,0.8); font-size: 1rem; }
+    .meta-pills { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+    .pill {
+      background: rgba(255,198,39,0.2);
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* ── Layout ── */
+    .page { max-width: 1400px; margin: 0 auto; padding: 40px 6rem; }
+    .two-col { display: grid; grid-template-columns: 260px 1fr; gap: 40px; align-items: start; }
+
+    /* ── Sidebar TOC ── */
+    .toc {
+      position: sticky;
+      top: 24px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+    }
+    .toc h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
+    .toc a {
+      display: block;
+      padding: 6px 0;
+      color: var(--text);
+      text-decoration: none;
+      font-size:16px;
+      border-left: 2px solid transparent;
+      padding-left: 10px;
+      transition: all 0.2s;
+    }
+    .toc a:hover { border-left-color: var(--maroon); color: var(--maroon); }
+    .toc a.sub { padding-left: 22px; font-size:14px; color: var(--muted); }
+
+    /* ── Content ── */
+    .content section { margin-bottom: 56px; }
+    .content h2 {
+      font-size: 1.6rem;
+      color: var(--maroon);
+      border-bottom: 3px solid var(--gold);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .content h3 { font-size: 1.15rem; color: var(--dark); margin: 24px 0 10px; font-weight: 600; }
+    .content p { margin-bottom: 14px; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .card h4 { font-size: 1rem; color: var(--maroon); margin-bottom: 8px; font-weight: 600; }
+
+    /* ── Evidence blocks ── */
+    .evidence {
+      background: #fff8e1;
+      border-left: 4px solid var(--gold);
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      margin: 16px 0;
+      font-size:16px;
+    }
+    .evidence strong { color: var(--maroon); }
+
+    /* ── Code ── */
+    pre {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 16px 0;
+    }
+    code { font-family: 'Consolas', 'Courier New', monospace; }
+    p code, li code {
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--maroon);
+    }
+
+    /* ── Images ── */
+    .img-block {
+      text-align: center;
+      margin: 20px 0;
+    }
+    .img-block img {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .img-block figcaption {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    /* ── Video ── */
+    .video-block {
+      margin: 20px 0;
+      text-align: center;
+    }
+    .video-block video {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .video-block p { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+    /* ── Hazard table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size:16px;
+    }
+    th {
+      background: var(--maroon);
+      color: white;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+    }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    tr:nth-child(even) td { background: #fafafa; }
+
+    /* ── Layer badges ── */
+    .layer-badge {
+      display: inline-block;
+      background: var(--maroon);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin-right: 6px;
+    }
+
+    /* ── State machine ── */
+    .states {
+      display: flex;
+      gap: 0;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .state {
+      flex: 1;
+      min-width: 100px;
+      padding: 14px 10px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    .state:first-child { border-radius: 8px 0 0 8px; }
+    .state:last-child { border-radius: 0 8px 8px 0; }
+    .state.s1 { background: #f0f0f0; }
+    .state.s2 { background: #e1f5ee; color: #0F6E56; }
+    .state.s3 { background: #faeeda; color: #633806; }
+    .state.s4 { background: #eaf3de; color: #27500A; }
+    .state.s5 { background: #f0f0f0; }
+    .state .arrow {
+      position: absolute;
+      right: -10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #999;
+      font-size:18px;
+      z-index: 1;
+    }
+
+    /* ── PDF links ── */
+    .pdf-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--text);
+      margin-bottom: 10px;
+      transition: border-color 0.2s;
+    }
+    .pdf-link:hover { border-color: var(--maroon); }
+    .pdf-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--maroon);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .pdf-link span { font-size:16px; font-weight: 500; }
+
+    /* ── Progress bar ── */
+    .progress-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .progress-label { width: 160px; font-size: 13px; font-weight: 600; }
+    .progress-bar { flex: 1; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--maroon); border-radius: 4px; }
+    .progress-pct { font-size: 13px; color: var(--muted); width: 36px; text-align: right; }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--dark);
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      padding: 24px;
+      font-size: 13px;
+      margin-top: 60px;
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+
+    @media (max-width: 768px) {
+      .two-col { grid-template-columns: 1fr; }
+      .toc { display: none; }
+      .card-grid { grid-template-columns: 1fr; }
+      .page { padding: 20px; }
+    }
+
+  /* ── LIGHTBOX / IMAGE ZOOM ── */
+  .img-zoom { cursor: zoom-in; transition: transform 0.2s; }
+  .img-zoom:hover { transform: scale(1.01); }
+  .lb { display: none; position: fixed; inset: 0; background: rgba(10,8,6,0.92); z-index: 9999; align-items: center; justify-content: center; cursor: zoom-out; }
+  .lb.active { display: flex; }
+  .lb img { max-width: 92vw; max-height: 88vh; border-radius: 8px; }
+  .lb-close { position: fixed; top: 20px; right: 28px; color: white; font-size: 24px; cursor: pointer; background: rgba(255,255,255,0.1); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; }
+
+  /* ── Gold cursor ── */
+body{cursor:none;}
+#g-cur{position:fixed;width:10px;height:10px;background:#FFC627;border-radius:50%;pointer-events:none;z-index:99999;transform:translate(-50%,-50%);transition:transform 0.15s;}
+#g-ring{position:fixed;width:28px;height:28px;border:1.5px solid rgba(255,198,39,0.55);border-radius:50%;pointer-events:none;z-index:99998;transform:translate(-50%,-50%);}
+.lhover #g-cur{transform:translate(-50%,-50%) scale(2.2);background:rgba(255,198,39,0.5);}
+.lhover #g-ring{transform:translate(-50%,-50%) scale(0.7);border-color:#FFC627;}
+@media(max-width:960px){body{cursor:auto;}#g-cur,#g-ring{display:none;}}
+
+  /* Circuit board background */
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
+    background-image:
+      radial-gradient(circle, rgba(140,29,64,0.05) 1px, transparent 1px),
+      linear-gradient(rgba(140,29,64,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(140,29,64,0.02) 1px, transparent 1px);
+    background-size:48px 48px, 48px 48px, 48px 48px;}
+  /* Report specific styles */
+  .report h2{font-size:1.6rem;color:var(--maroon);border-bottom:3px solid var(--gold);padding-bottom:10px;margin-bottom:20px;margin-top:52px;}
+  .report h2:first-child{margin-top:0;}
+  .report h3{font-size:1.15rem;color:var(--dark);margin:24px 0 10px;font-weight:600;}
+  .report p{margin-bottom:14px;font-size:16px;line-height:1.75;}
+  .report ul,.report ol{padding-left:20px;margin-bottom:14px;}
+  .report li{font-size:16px;line-height:2;margin-bottom:4px;}
+  .report pre{background:#1e1e1e;color:#d4d4d4;padding:20px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.6;margin:16px 0;}
+  .report code{font-family:'Consolas','Courier New',monospace;}
+  .report p code,.report li code{background:#f0f0f0;padding:2px 6px;border-radius:4px;font-size:13px;color:var(--maroon);}
+  .issue-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:14px;border-left:4px solid var(--gold);box-shadow:0 2px 6px rgba(0,0,0,0.04);}
+  .issue-card .issue-title{font-weight:700;color:var(--maroon);margin-bottom:6px;font-size:15px;}
+  .issue-card .issue-status{font-size:12px;font-weight:600;display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:8px;}
+  .fixed{background:#d4edda;color:#155724;}
+  .partial{background:#fff3cd;color:#856404;}
+  .workaround{background:#e8f4fd;color:#0c5460;}
+  .callout{border-radius:8px;padding:14px 18px;margin:16px 0;font-size:15px;}
+  .c-gold{background:#fffbea;border-left:4px solid var(--gold);}
+  .c-info{background:#e8f4fd;border-left:4px solid #2196F3;}
+  .c-warn{background:#fff3e0;border-left:4px solid #FF9800;}
+  .c-success{background:#e8f5e9;border-left:4px solid #4CAF50;}
+  .callout strong{color:var(--maroon);}
+  .callout p{margin:0;font-size:14px;}
+</style>
+</head>
+<body>
+<div id="g-cur"></div>
+<div id="g-ring"></div>
+<div class="lb" id="lb2"><button class="lb-close" onclick="document.getElementById('lb2').classList.remove('active')">✕</button><img id="lb2-img" src="" alt=""/></div>
+
+<nav class="top-nav">
+  <a class="tn-brand" href="../index.html">
+    <div class="tn-logo">AFE</div>
+    <span class="tn-title">Autonomous Frontier Exploration</span>
+  </a>
+  <ul class="tn-links">
+    <li><a href="../index.html">Home</a></li>
+    <li class="tn-dropdown">
+      <a href="#">Milestones ▾</a>
+      <div class="tn-dropdown-menu">
+        <a href="../milestones/milestone1.html">Milestone 1 — Proposal</a>
+        <a href="../milestones/milestone2.html">Milestone 2 — Technical Proof</a>
+        <a href="../milestones/milestone3.html">Milestone 3 — Final Dossier</a>
+      </div>
+    </li>
+    <li><a href="report.html" style="color:#FFC627;">Report ✦</a></li>
+    <li><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank" style="color:#FFC627;">GitHub ↗</a></li>
+  </ul>
+</nav>
+
+<header>
+  <div class="header-top">
+    <span>ASU · RAS 598 · Mobile Robotics · Spring 2026</span>
+  </div>
+  <div class="header-body">
+    <h1>Full Project Report</h1>
+    <p class="sub">Everything we built, every issue we found, every lesson learned — from first commit to final demo</p>
+    <div class="meta-pills">
+      <span class="pill">Spring 2026</span>
+      <span class="pill">Complete Project Report</span>
+      <span class="pill">All milestones covered</span>
+      <span class="pill">Princess Colon · Rohit Mane · Manjunath Kondamu</span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <div class="two-col">
+    <aside>
+      <nav class="toc">
+        <h3>Contents</h3>
+        <a href="#overview">1. Project Overview</a>
+        <a href="#motivation">2. Motivation & Goals</a>
+        <a href="#architecture">3. System Architecture</a>
+        <a href="#slam">4. SLAM & Mapping</a>
+        <a href="#frontier">5. Frontier Exploration</a>
+        <a href="#navigation">6. Navigation Planner</a>
+        <a href="#hazard">7. Hazard Detection</a>
+        <a href="#coordinator">8. Behavior Coordinator</a>
+        <a href="#simulation">9. Simulation Debugging</a>
+        <a href="#hardware">10. Hardware Testing</a>
+        <a href="#issues">11. Issues Found</a>
+        <a href="#lessons">12. What We Learned</a>
+        <a href="#future">13. Future Work</a>
+      </nav>
+    </aside>
+    <main class="content">
+      <div style="margin-bottom:32px;">
+        <a href="report.pdf" download="AFE_Project_Report_RAS598.pdf"
+           style="display:inline-flex;align-items:center;gap:10px;background:var(--maroon);color:white;padding:12px 24px;border-radius:10px;font-size:15px;font-weight:700;text-decoration:none;">
+          ⬇ Download PDF Report
+        </a>
+      </div>
+
+
+      <section id="overview">
+        <h2>1. Project Overview</h2>
+        <p>This project implements a fully autonomous ground robot system capable of exploring unknown indoor environments, building real-time occupancy maps, and detecting semantic hazards — all without any human teleoperation or pre-loaded maps.</p>
+        <p>The platform is a TurtleBot4 Lite running ROS 2 Jazzy on Ubuntu 24.04. The robot is equipped with an RPLIDAR A1M8 360° LiDAR for mapping and navigation, an OAK-D spatial AI stereo camera for depth sensing and hazard classification, a Create3 mobile base with onboard sensors (cliff, bump, IMU, wheel encoders), and a Raspberry Pi 4B as the onboard computer.</p>
+        <p>The complete system consists of five custom ROS 2 nodes communicating over topics and action servers, plus SLAM Toolbox for mapping. The project spans three course milestones over Spring 2026, from initial architecture design to validated empirical benchmarking.</p>
+        <div class="callout c-success">
+          <strong>Final result:</strong> A working autonomous exploration system that detects frontier cells, plans collision-free paths using A*, and classifies HAZMAT signs, fire, cliffs, potholes, and narrow corridors using a 5-layer sensor fusion pipeline. Running in both Gazebo simulation (maze world) and on real hardware.
+        </div>
+      </section>
+
+      <section id="motivation">
+        <h2>2. Motivation &amp; Goals</h2>
+        <p>The core problem we wanted to solve: <strong>how can a robot safely enter an unknown dangerous environment and give first responders a complete picture of what's inside before they enter?</strong></p>
+        <p>Real-world applications include post-disaster search and rescue (collapsed buildings, fire scenes), industrial inspection (chemical plants, confined spaces), and nuclear facility assessment — all environments where human entry carries significant risk before a situation assessment is complete.</p>
+        <h3>Project Goals</h3>
+        <ul>
+          <li>Autonomous map-building in unknown environments using SLAM (no pre-loaded map required)</li>
+          <li>Systematic frontier-based exploration — explore the nearest unknown areas first</li>
+          <li>Collision-free navigation without Nav2 (custom A* planner)</li>
+          <li>Semantic hazard detection: HAZMAT signs (13 classes), fire, cliffs, potholes, narrow corridors, glass walls</li>
+          <li>Real-time RViz2 visualization of map, robot pose, path, and hazard markers</li>
+          <li>Unified launch for both simulation and real hardware via single flag</li>
+        </ul>
+      </section>
+
+      <section id="architecture">
+        <h2>3. System Architecture</h2>
+        <p>The system is built as five custom ROS 2 nodes communicating over a well-defined topic interface. The design principle was clear separation of concerns — each node has one job and communicates via standard ROS 2 interfaces.</p>
+        <h3>ROS 2 Topic Graph</h3>
+        <table class="dt">
+          <thead><tr><th>Publisher</th><th>Topic</th><th>Message Type</th><th>Subscriber</th></tr></thead>
+          <tbody>
+            <tr><td>slam_toolbox</td><td>/map</td><td>OccupancyGrid</td><td>frontier_explorer, navigation_planner</td></tr>
+            <tr><td>frontier_explorer</td><td>/frontier_goals</td><td>PoseArray</td><td>behavior_coordinator</td></tr>
+            <tr><td>behavior_coordinator</td><td>/navigate_to_pose (action)</td><td>NavigateToPose</td><td>navigation_planner</td></tr>
+            <tr><td>navigation_planner</td><td>/cmd_vel_unstamped</td><td>Twist</td><td>Create3 base</td></tr>
+            <tr><td>semantic_hazard</td><td>/hazard_alert</td><td>String</td><td>behavior_coordinator</td></tr>
+            <tr><td>semantic_hazard</td><td>/exploration/stop</td><td>Bool</td><td>behavior_coordinator, navigation_planner</td></tr>
+            <tr><td>semantic_hazard</td><td>/hazard_markers</td><td>MarkerArray</td><td>RViz2</td></tr>
+            <tr><td>Create3</td><td>/hazard_detection</td><td>HazardDetectionVector</td><td>semantic_hazard</td></tr>
+            <tr><td>scan_relay</td><td>/scan_fixed</td><td>LaserScan</td><td>slam_toolbox (sim only)</td></tr>
+          </tbody>
+        </table>
+        <h3>Hardware Setup</h3>
+        <ul>
+          <li><strong>Robot:</strong> TurtleBot4 Lite — Create3 base + Raspberry Pi 4B + OAK-D camera + RPLIDAR A1M8</li>
+          <li><strong>Compute (development):</strong> Manjunath's laptop — NVIDIA RTX 5070 Ti, CUDA 13.1, Ubuntu 24.04</li>
+          <li><strong>Networking:</strong> ROS 2 Jazzy with Zenoh discovery server at 192.168.50.93:11811</li>
+          <li><strong>Simulation:</strong> Gazebo Sim 8 (Harmonic), turtlebot4_gz_bringup, maze world</li>
+        </ul>
+      </section>
+
+      <section id="slam">
+        <h2>4. SLAM &amp; Mapping</h2>
+        <p>We use <code>slam_toolbox</code> in async mapping mode. The robot builds a 2D occupancy grid at 0.05m/cell resolution as it moves. The SLAM node processes LiDAR scans and publishes a <code>map→odom</code> TF transform that the entire navigation stack depends on.</p>
+        <h3>Configuration</h3>
+        <p>Key parameters in <code>slam_sim.yaml</code>: <code>scan_topic: /scan_fixed</code> (simulation), <code>resolution: 0.05</code>, <code>map_update_interval: 2.0</code>, <code>transform_timeout: 0.2</code>, <code>tf_buffer_duration: 20.0</code>.</p>
+        <h3>Real vs Simulation Difference</h3>
+        <p>On real hardware, SLAM starts and builds maps immediately — the RPLIDAR A1M8 publishes in <code>rplidar_link</code> frame which matches exactly what SLAM expects. In simulation, the LiDAR publishes in <code>turtlebot4/rplidar_link/rplidar</code> frame (a known Gazebo naming quirk) which required a scan relay node to fix the frame_id before SLAM could process it.</p>
+      </section>
+
+      <section id="frontier">
+        <h2>5. Frontier Exploration</h2>
+        <p>Frontier exploration is the core algorithm for autonomous navigation in unknown environments. A frontier is defined as a free cell adjacent to an unknown cell — the boundary between what the robot knows and doesn't know.</p>
+        <h3>Algorithm</h3>
+        <p>The frontier explorer runs every time a new map is received (approximately 1Hz). It scans all free cells, identifies those adjacent to unknown cells (and not adjacent to occupied cells), groups them into clusters via 4-connected flood fill, discards clusters with fewer than 10 cells (noise), and scores each cluster by inverse distance from the robot — nearest first.</p>
+        <h3>Scoring Evolution</h3>
+        <p>We went through two scoring approaches during development:</p>
+        <ul>
+          <li><strong>Original:</strong> <code>score = (α × cluster_size + β × unknown_nearby) / (dist + ε)</code> — weighted combination of frontier size, nearby unknown area, and distance. This caused the robot to chase large unknown areas rather than exploring systematically.</li>
+          <li><strong>Final (nearest-first wavefront):</strong> <code>score = 1.0 / (dist + ε)</code> — simply go to the closest frontier. Combined with the proximity lock in the behavior coordinator, this produces systematic nearest-first exploration.</li>
+        </ul>
+        <div class="callout c-gold">
+          <strong>Key insight:</strong> Nearest-first scoring is simpler AND better in practice. The robot explores nearby areas completely before moving to distant frontiers, which is exactly what you want in a confined indoor environment.
+        </div>
+      </section>
+
+      <section id="navigation">
+        <h2>6. Navigation Planner</h2>
+        <p>We built a complete custom navigation planner as a ROS 2 action server implementing the <code>/navigate_to_pose</code> interface — the same interface Nav2 uses. This means our planner is a drop-in replacement for Nav2 without requiring any Nav2 infrastructure.</p>
+        <h3>Why Not Nav2?</h3>
+        <p>We tried Nav2 initially. The issues: (1) Nav2's costmap inflation was very aggressive and kept marking valid frontier cells as obstacles, (2) Nav2 adds significant complexity and has many parameters to tune, (3) Our custom planner gives us full control over the exact behavior we want.</p>
+        <h3>What We Built</h3>
+        <ul>
+          <li><strong>Costmap builder:</strong> Converts SLAM OccupancyGrid to a cost map with 3 tiers — free (0), soft inflation zone (10), hard inflation zone (80), wall (1000). Wall cells are dilated by 3cm before inflation to account for sensor noise.</li>
+          <li><strong>A* path planner:</strong> 8-connected grid search with Euclidean heuristic. Costs from the costmap bias the planner away from walls without preventing paths near walls.</li>
+          <li><strong>Waypoint pruning:</strong> Removes intermediate waypoints that have line-of-sight to each other (swept-corridor test accounting for robot half-width 0.20m). Dramatically reduces unnecessary turning.</li>
+          <li><strong>P-controller drive loop:</strong> 20Hz control loop. Aligns to waypoint heading first (in-place rotation), then drives forward while maintaining heading. Progressive slowdown as the robot approaches each waypoint.</li>
+        </ul>
+        <h3>Key Parameters (after tuning)</h3>
+        <table class="dt">
+          <tr><th>Parameter</th><th>Final Value</th><th>Notes</th></tr>
+          <tr><td>ALIGN_THRESHOLD</td><td>0.20 rad</td><td>Was 0.10 — too tight, caused oscillation</td></tr>
+          <tr><td>SNAP_SEARCH_RADIUS</td><td>20 cells</td><td>Was 10 — frontier goals in walls</td></tr>
+          <tr><td>V_MAX</td><td>0.35 m/s</td><td>Safe for real hardware</td></tr>
+          <tr><td>HARD_RADIUS</td><td>0.15 m</td><td>Robot half-width clearance</td></tr>
+          <tr><td>NO_DRIVE_TIMEOUT</td><td>6.0 s</td><td>Abort if stuck turning</td></tr>
+        </table>
+      </section>
+
+      <section id="hazard">
+        <h2>7. Semantic Hazard Detection</h2>
+        <p>The hazard classifier is the most complex node. It fuses five sensor layers into a single hazard alert and publishes RViz2 visualization markers.</p>
+        <h3>5-Layer Architecture</h3>
+        <ul>
+          <li><strong>L1 — Hardware (Create3):</strong> Subscribes to <code>/hazard_detection</code>. Cliff sensors trigger immediate E-stop. Response time &lt;10ms.</li>
+          <li><strong>L2a — YOLO Fire (YOLOv5):</strong> Custom-trained <code>fire_best.pt</code> model. Confidence threshold 0.45. Detects fire from phone screen at 63% confidence. Printed images below threshold.</li>
+          <li><strong>L2b — HSV Vision:</strong> Fixed thresholds for fire (H∈[0,15]∪[165,179], S>150, V>200). Calibrated under ASU ISTB lab fluorescent lighting. Water detection disabled — caused false positives on blue walls.</li>
+          <li><strong>L3 — Depth Analysis (OAK-D):</strong> NaN ratio >50% in floor region → GLASS. Depth drop >0.20m → POTHOLE. Pothole implemented but not yet tested on real hardware.</li>
+          <li><strong>L4 — LiDAR Sector:</strong> Minimum ranges in 3 sectors (front, left, right) after correcting for the +90° RPLIDAR mounting offset in the URDF. NARROW_CORRIDOR if any sector &lt;0.30m.</li>
+          <li><strong>L5 — DeepHAZMAT:</strong> YOLOv3-tiny model with 13 HAZMAT classes (explosive, flammable, toxic, radioactive, etc.). 7M parameters, 15.8 GFLOPs. ~30ms inference on RTX 5070 Ti.</li>
+        </ul>
+        <h3>YOLO Worker Thread</h3>
+        <p>A critical design decision: YOLO inference runs in a dedicated background thread with a 1-second cooldown (<code>YOLO_INTERVAL_SEC = 1.0</code>). This prevents YOLO from blocking the main ROS 2 executor. Princess had the old version without this — she experienced a 30-second camera backlog because inference was blocking the main thread.</p>
+        <h3>LiDAR Angle Correction</h3>
+        <p>The RPLIDAR A1M8 is mounted with a +90° rotation offset in the TurtleBot4 Lite URDF (<code>rpy="0 0 π/2"</code>). Without correcting for this, the sector analysis computes wrong angles. Fix: <code>θ_robot = θ_lidar − π/2</code> before all sector computations.</p>
+      </section>
+
+      <section id="coordinator">
+        <h2>8. Behavior Coordinator</h2>
+        <p>The behavior coordinator is the "brain" that orchestrates the exploration. It manages the lifecycle from startup to completion, handles goal selection, tracks failures, and implements stability mechanisms.</p>
+        <h3>6-State FSM</h3>
+        <p>States: IDLE → SELECTING → PENDING → NAVIGATING → ARRIVED → DONE. The robot starts in SELECTING, picks the nearest frontier, sends a navigation goal, tracks success/failure, and continues until all frontiers are explored or battery is low.</p>
+        <h3>Proximity Lock (Key Innovation)</h3>
+        <p>Without the proximity lock, the robot would constantly switch targets as the SLAM map updated and new frontiers appeared closer. The lock says: if the robot is within <code>2 × PROXIMITY_LOCK_RADIUS = 6m</code> of its current goal anchor, ignore all frontier updates. This was changed from 1.0m → 2.0m → 3.0m through testing. At 3.0m, the robot commits to its frontier long enough to actually reach it before the map changes enough to warrant switching.</p>
+        <h3>Frontier Similarity Radius</h3>
+        <p>Frontiers drift as the map updates — the same physical area gets slightly different centroid coordinates each update. Rather than cancelling a goal every time the centroid drifts by a few cells, we check if any current frontier is within 0.50m of the original goal anchor. If yes, update the goal coordinates silently (no cancel/replan).</p>
+      </section>
+
+      <section id="simulation">
+        <h2>9. Simulation Debugging</h2>
+        <p>Getting the simulation working took significant effort. Multiple independent bugs needed to be found and fixed before the system worked end-to-end in Gazebo.</p>
+
+        <div class="issue-card">
+          <div class="issue-title">Bug 1: LiDAR all readings 0.164m (minimum range)</div>
+          <span class="issue-status fixed">Fixed</span>
+          <p><strong>Root cause:</strong> Gazebo Sim 8 uses Ogre1 as the default GPU renderer for ray sensors. The TurtleBot4 self-collision geometry caused all 640 LiDAR rays to hit the robot's own mesh at minimum range. This produced a LiDAR that saw nothing but itself.</p>
+          <p><strong>Fix:</strong> Change <code>&lt;render_engine&gt;ogre&lt;/render_engine&gt;</code> to <code>ogre2</code> in <code>/opt/ros/jazzy/share/irobot_create_description/urdf/create3.urdf.xacro</code>. Required <code>sudo</code> to edit the read-only system file. This is upstream GitHub issue #676.</p>
+          <pre>sudo sed -i 's/&lt;render_engine&gt;ogre&lt;\/render_engine&gt;/&lt;render_engine&gt;ogre2&lt;\/render_engine&gt;/' \
+  /opt/ros/jazzy/share/irobot_create_description/urdf/create3.urdf.xacro</pre>
+        </div>
+
+        <div class="issue-card">
+          <div class="issue-title">Bug 2: SLAM frame_id mismatch</div>
+          <span class="issue-status fixed">Fixed with scan_relay_node</span>
+          <p><strong>Root cause:</strong> Gazebo publishes the LiDAR scan in frame <code>turtlebot4/rplidar_link/rplidar</code> (Gazebo's full entity path naming). SLAM toolbox expected frame <code>rplidar_link</code>. The frame mismatch caused SLAM to silently drop all scan messages.</p>
+          <p><strong>Fix:</strong> Created <code>scan_relay_node.py</code> — a simple ROS 2 node that subscribes to <code>/scan</code> and republishes to <code>/scan_fixed</code> with the corrected frame_id. SLAM configured to use <code>/scan_fixed</code> via <code>slam_sim.yaml</code>.</p>
+        </div>
+
+        <div class="issue-card">
+          <div class="issue-title">Bug 3: SLAM scan_topic overwritten by turtlebot4 launch</div>
+          <span class="issue-status fixed">Fixed by bypassing turtlebot4 SLAM launch</span>
+          <p><strong>Root cause:</strong> The turtlebot4_navigation SLAM launch file uses <code>RewrittenYaml</code> which programmatically overwrites <code>scan_topic</code> to <code>namespace/scan</code> — completely ignoring any custom yaml we passed in.</p>
+          <p><strong>Fix:</strong> Bypass the turtlebot4 SLAM launch entirely. Run <code>slam_toolbox</code> directly with our <code>slam_sim.yaml</code>. Also required manual lifecycle activation: <code>ros2 lifecycle set /slam_toolbox configure &amp;&amp; ros2 lifecycle set /slam_toolbox activate</code>.</p>
+        </div>
+
+        <div class="issue-card">
+          <div class="issue-title">Bug 4: diffdrive_controller rejecting velocity commands</div>
+          <span class="issue-status fixed">Fixed</span>
+          <p><strong>Root cause:</strong> The navigation planner uses wall clock time (<code>time.time()</code>) for its control loop, but Gazebo runs on sim time. The diffdrive_controller checks command timestamps and rejects any command older than 0.5 seconds — wall clock timestamps appeared 0.5s+ "old" from the sim clock's perspective.</p>
+          <p><strong>Fix:</strong> <code>ros2 param set /diffdrive_controller cmd_vel_timeout 2.0</code>. Also ensures all custom nodes use <code>use_sim_time:=true</code>.</p>
+        </div>
+
+        <div class="issue-card">
+          <div class="issue-title">Bug 5: SLAM lifecycle — stuck at "Node using stack size"</div>
+          <span class="issue-status workaround">Workaround: manual lifecycle activation</span>
+          <p><strong>Root cause:</strong> When slam_toolbox is launched as an unmanaged node with our direct invocation, it initializes but doesn't auto-configure/activate. It sits in <code>unconfigured</code> state waiting.</p>
+          <p><strong>Fix:</strong> After launching SLAM, manually trigger: <code>ros2 lifecycle set /slam_toolbox configure</code> then <code>ros2 lifecycle set /slam_toolbox activate</code>. The <code>run_exploration.sh</code> script handles this automatically.</p>
+        </div>
+
+        <div class="issue-card">
+          <div class="issue-title">Bug 6: Frontier goals in obstacle cells ("surrounded by obstacles")</div>
+          <span class="issue-status fixed">Fixed with SNAP_SEARCH_RADIUS=20</span>
+          <p><strong>Root cause:</strong> Frontier centroids land at the exact boundary between free and unknown space — which in the costmap often falls within the wall inflation zone. The planner rejected these as impassable.</p>
+          <p><strong>Fix:</strong> Increased <code>SNAP_SEARCH_RADIUS</code> from 10 to 20 cells. The planner now searches up to 20 cells around the goal for the nearest free cell before giving up.</p>
+        </div>
+      </section>
+
+      <section id="hardware">
+        <h2>10. Hardware Testing</h2>
+        <p>The system was tested on the real TurtleBot4 Lite in the ASU lab environment. Key observations from hardware runs:</p>
+        <h3>What worked well on hardware</h3>
+        <ul>
+          <li>SLAM builds maps immediately — the real RPLIDAR publishes in the correct frame, no relay node needed</li>
+          <li>DeepHAZMAT detected Explosive 1.1 at 92% confidence and Radioactive I at 99% confidence at ~0.5m range</li>
+          <li>Cliff sensor E-stop worked reliably — tested on table edge, triggered within &lt;10ms</li>
+          <li>Navigation planner navigated corridors without bumping walls with the tuned parameters</li>
+          <li>YOLOv5 fire detection worked at 63% confidence on phone screen video</li>
+        </ul>
+        <h3>Issues on hardware</h3>
+        <ul>
+          <li>Camera processing backlog (~30s delay) on Princess's machine — fixed by pulling the latest YOLO worker thread version</li>
+          <li>Marker placement offset — HAZMAT markers placed at fixed 0.70m ahead of robot rather than at actual depth-estimated distance. Known limitation, future fix: use OAK-D depth to project marker position.</li>
+          <li>WiFi latency causes occasional topic dropouts — Zenoh discovery server at 192.168.50.93:11811 must be reachable</li>
+        </ul>
+        <h3>Hardware Run Order</h3>
+        <pre>source ~/mobile-robotics-frontier-exploration/open_ros_env.sh
+source ~/mobile-robotics-frontier-exploration/ros2_ws/install/setup.bash
+# Terminal 1: Launch everything
+ros2 launch frontier_exploration_mapping exploration.launch.py use_sim_time:=false
+# Terminal 2: Debug monitor
+python3 ~/debug_monitor.py</pre>
+      </section>
+
+      <section id="issues">
+        <h2>11. Issues Found (Complete List)</h2>
+        <p>Every problem we encountered and how we resolved it:</p>
+        <table class="dt">
+          <thead><tr><th>#</th><th>Issue</th><th>Root Cause</th><th>Resolution</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>LiDAR all 0.164m in sim</td><td>Ogre1 renderer + self-collision</td><td>Change render_engine to ogre2</td></tr>
+            <tr><td>2</td><td>SLAM not building map (sim)</td><td>frame_id mismatch Gazebo vs ROS2</td><td>scan_relay_node.py</td></tr>
+            <tr><td>3</td><td>SLAM ignoring custom scan_topic</td><td>turtlebot4 launch uses RewrittenYaml</td><td>Bypass turtlebot4 SLAM launch, run slam_toolbox directly</td></tr>
+            <tr><td>4</td><td>Robot not moving (sim)</td><td>diffdrive_controller timestamp mismatch</td><td>cmd_vel_timeout 2.0 + use_sim_time</td></tr>
+            <tr><td>5</td><td>SLAM stuck unconfigured</td><td>Lifecycle not auto-activated</td><td>Manual lifecycle set configure + activate</td></tr>
+            <tr><td>6</td><td>All frontier goals → "surrounded by obstacles"</td><td>Frontiers in wall inflation zone</td><td>SNAP_SEARCH_RADIUS = 20 cells</td></tr>
+            <tr><td>7</td><td>Robot oscillating between frontiers</td><td>Score changes every map update</td><td>PROXIMITY_LOCK_RADIUS = 3.0m</td></tr>
+            <tr><td>8</td><td>ALIGN_THRESHOLD too tight → oscillation</td><td>0.10 rad → robot kept rotating</td><td>ALIGN_THRESHOLD = 0.20 rad</td></tr>
+            <tr><td>9</td><td>Camera 30s backlog (Princess)</td><td>Old YOLO blocking main thread</td><td>Threaded YOLO worker + cooldown 1Hz</td></tr>
+            <tr><td>10</td><td>LiDAR sector angles wrong</td><td>+90° URDF mounting offset ignored</td><td>θ_robot = θ_lidar − π/2</td></tr>
+            <tr><td>11</td><td>Water detection false positives</td><td>HSV water range matched blue walls</td><td>Disabled water HSV detection</td></tr>
+            <tr><td>12</td><td>Multiple scan_relay nodes running</td><td>Old inline Python scripts + new node</td><td>Kill all scan_relay before fresh start</td></tr>
+            <tr><td>13</td><td>Root-level build/install folders</td><td>colcon build run from wrong directory</td><td>Always build from ros2_ws/ directory</td></tr>
+            <tr><td>14</td><td>Hazard marker placement offset</td><td>Fixed 0.70m ahead, no depth projection</td><td>Known limitation — future fix with OAK-D depth</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="lessons">
+        <h2>12. What We Learned</h2>
+        <h3>Technical Lessons</h3>
+        <ul>
+          <li><strong>Simulation ≠ hardware.</strong> Every bug we fixed in simulation was a different bug than what exists on hardware. The Ogre2 LiDAR fix, the frame_id relay, the lifecycle management — none of these exist on real hardware. Always test on real hardware as early as possible.</li>
+          <li><strong>Simple algorithms often beat complex ones.</strong> The original frontier scoring formula (weighted combination of size, unknown area, and distance) sounded more principled than nearest-first, but it caused the robot to oscillate. score = 1/(dist+ε) with a proximity lock is simpler and works better.</li>
+          <li><strong>Simulation time is subtle.</strong> The diffdrive_controller timestamp bug took hours to debug. Wall clock vs sim clock mismatches can manifest in unexpected ways — always add use_sim_time to every node.</li>
+          <li><strong>Threading matters for real-time systems.</strong> YOLO inference at 30ms/frame is fast enough, but blocking the main ROS executor with it caused a 30-second backlog. Always run heavy computation in a separate thread.</li>
+          <li><strong>ROS 2 lifecycle nodes need explicit activation.</strong> slam_toolbox being a lifecycle node that requires manual configure+activate is not obvious from the documentation.</li>
+          <li><strong>Check your URDF.</strong> The LiDAR angle correction (+90°) was buried in the TurtleBot4 URDF and took time to find. Always visualize TF trees when sensor data looks wrong.</li>
+        </ul>
+        <h3>Process Lessons</h3>
+        <ul>
+          <li>Use the debug monitor from day one — having real-time visibility into map size, frontier count, and LiDAR status saved hours of debugging.</li>
+          <li>Push frequently and use git properly — being able to find exactly when a bug was introduced via git bisect is invaluable.</li>
+          <li>Document issues as you find them — this report section was written from memory and git commit messages. Future projects should log issues in real time.</li>
+          <li>Split simulation debugging from hardware testing explicitly — they have completely different failure modes.</li>
+        </ul>
+        <h3>What We Would Do Differently</h3>
+        <ul>
+          <li>Start with real hardware testing earlier — we spent too long on simulation before testing on the robot</li>
+          <li>Use Nav2's lifecycle manager properly or build our own instead of working around it</li>
+          <li>Add depth-based marker placement from the start instead of fixed offset</li>
+          <li>Implement a proper rosbag-based regression test suite so parameter changes don't break existing functionality</li>
+        </ul>
+      </section>
+
+      <section id="future">
+        <h2>13. Future Work</h2>
+        <ul>
+          <li><strong>Depth-based hazard marker placement:</strong> Use OAK-D depth frame to project the 2D bounding box center through camera intrinsics → 3D world position → transform to odom frame. Would eliminate the fixed-offset placement error.</li>
+          <li><strong>Multi-floor exploration:</strong> Current system assumes flat ground. Adding floor-change detection and staircase navigation would significantly expand applicability.</li>
+          <li><strong>Semantic costmap integration:</strong> HAZMAT and fire detections currently publish markers only. Integrating semantic hazards into the navigation costmap (marking detected hazard zones as high-cost) would prevent the robot from navigating through detected danger zones.</li>
+          <li><strong>Hardware pothole testing:</strong> The pothole depth analysis is implemented but not tested on real hardware. Need to create a physical test environment with a small drop (>0.20m).</li>
+          <li><strong>Predictive hazard propagation:</strong> Mark adjacent cells as high-risk before the robot reaches a detected hazard, closing the temporal vulnerability window between frontier selection and hazard classification.</li>
+          <li><strong>Next-Best-View frontier scoring:</strong> Replace nearest-first with information-gain-per-meter-traveled scoring (NBV). Each frontier would be evaluated for how much new unknown area it would reveal, weighted by travel cost.</li>
+          <li><strong>Multi-robot coordination:</strong> Partition the environment between multiple robots to reduce exploration time. Each robot claims frontiers and communicates claimed areas to prevent duplicate work.</li>
+          <li><strong>3D mapping:</strong> Extend from 2D OccupancyGrid to 3D voxel map using OctoMap, enabling exploration of multi-level environments.</li>
+        </ul>
+      </section>
+
+    
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:56px;padding-top:24px;border-top:1px solid var(--border);">
+      <a href="../milestones/milestone3.html" style="display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--maroon);text-decoration:none;padding:10px 20px;border:1.5px solid rgba(140,29,64,0.2);border-radius:10px;">← Milestone 3</a>
+      <a href="../index.html" style="display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--maroon);text-decoration:none;padding:10px 20px;border:1.5px solid rgba(140,29,64,0.2);border-radius:10px;">Home →</a>
+    </div>
+    </main>
+  </div>
+</div>
+
+<footer>
+  <p>RAS 598: Mobile Robotics · Spring 2026 · Arizona State University ·
+    <a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank">GitHub Repository</a>
+  </p>
+</footer>
+
+<script>
+function openLb2(src){document.getElementById('lb2-img').src=src;document.getElementById('lb2').classList.add('active');}
+document.getElementById('lb2').addEventListener('click',function(e){if(e.target===this)this.classList.remove('active');});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')document.getElementById('lb2').classList.remove('active');});
+</script>
+<script>
+(function(){
+  const gc=document.getElementById('g-cur'),gr=document.getElementById('g-ring');
+  if(!gc)return;
+  let gx=0,gy=0,rx=0,ry=0;
+  document.addEventListener('mousemove',e=>{gx=e.clientX;gy=e.clientY;gc.style.left=gx+'px';gc.style.top=gy+'px';});
+  (function a(){rx+=(gx-rx)*0.12;ry+=(gy-ry)*0.12;gr.style.left=rx+'px';gr.style.top=ry+'px';requestAnimationFrame(a);})();
+  document.querySelectorAll('a,button').forEach(el=>{el.addEventListener('mouseenter',()=>document.body.classList.add('lhover'));el.addEventListener('mouseleave',()=>document.body.classList.remove('lhover'));});
+})();
+</script>
+</body>
+</html>
