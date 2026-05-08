@@ -207,6 +207,26 @@ footer{background:var(--maroon-dark);padding:56px 4rem;}
 .reveal-r.visible{opacity:1;transform:none;}
 .d1{transition-delay:0.1s!important;}.d2{transition-delay:0.2s!important;}.d3{transition-delay:0.3s!important;}.d4{transition-delay:0.4s!important;}
 
+/* ── LIGHTBOX ── */
+.idx-lb{display:none;position:fixed;inset:0;background:rgba(10,8,6,0.93);z-index:99999;flex-direction:column;align-items:center;justify-content:center;}
+.idx-lb.active{display:flex;}
+.idx-lb-viewport{overflow:hidden;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;cursor:grab;}
+.idx-lb-viewport.dragging{cursor:grabbing;}
+.idx-lb-viewport img{transform-origin:center center;user-select:none;pointer-events:none;border-radius:8px;max-width:92vw;max-height:88vh;transition:transform 0.15s ease;}
+.idx-lb-controls{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:rgba(20,16,14,0.85);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:50px;padding:8px 16px;z-index:100000;}
+.idx-lb-btn{background:rgba(255,255,255,0.1);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;line-height:1;}
+.idx-lb-btn:hover{background:rgba(255,198,39,0.3);color:var(--gold);}
+.idx-lb-zoom-label{font-size:13px;color:rgba(255,255,255,0.5);font-family:'JetBrains Mono',monospace;min-width:44px;text-align:center;}
+.idx-lb-close{position:fixed;top:20px;right:28px;color:white;font-size:20px;cursor:pointer;background:rgba(255,255,255,0.1);width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:none;transition:background 0.2s;z-index:100000;}
+.idx-lb-close:hover{background:rgba(255,198,39,0.25);}
+.idx-lb-hint{position:fixed;top:20px;left:50%;transform:translateX(-50%);font-size:12px;color:rgba(255,255,255,0.35);font-family:'JetBrains Mono',monospace;pointer-events:none;}
+/* thumbnail hover */
+.img-zoom-wrap{cursor:zoom-in;position:relative;border-radius:14px;overflow:hidden;}
+.img-zoom-wrap::after{content:'🔍  Click to zoom';position:absolute;bottom:14px;right:14px;background:rgba(140,29,64,0.85);color:white;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;opacity:0;transition:opacity 0.2s;pointer-events:none;}
+.img-zoom-wrap:hover::after{opacity:1;}
+.img-zoom-wrap img{transition:transform 0.3s ease;width:100%;display:block;}
+.img-zoom-wrap:hover img{transform:scale(1.015);}
+
 @media(max-width:960px){
   .what-inner,.team-grid,.ms-grid,.code-grid,.footer-inner{grid-template-columns:1fr;}
   nav,.hero,#what,#milestones,#team,#code-sec,#stats,footer{padding-left:1.5rem;padding-right:1.5rem;}
@@ -223,6 +243,20 @@ footer{background:var(--maroon-dark);padding:56px 4rem;}
 
 <div id="g-cur"></div>
 <div id="g-ring"></div>
+<!-- LIGHTBOX -->
+<div class="idx-lb" id="idx-lb">
+  <button class="idx-lb-close" id="idx-lb-close">✕</button>
+  <span class="idx-lb-hint">Scroll to zoom · Drag to pan</span>
+  <div class="idx-lb-viewport" id="idx-lb-viewport">
+    <img id="idx-lb-img" src="" alt=""/>
+  </div>
+  <div class="idx-lb-controls">
+    <button class="idx-lb-btn" id="lb-zoom-out" title="Zoom out">−</button>
+    <span class="idx-lb-zoom-label" id="lb-zoom-pct">100%</span>
+    <button class="idx-lb-btn" id="lb-zoom-in" title="Zoom in">+</button>
+    <button class="idx-lb-btn" id="lb-zoom-reset" title="Reset" style="font-size:13px;width:auto;padding:0 12px;border-radius:20px;">Reset</button>
+  </div>
+</div>
 <div id="tb-cursor">
   <svg viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
     <!-- Outer body ring -->
@@ -267,6 +301,7 @@ footer{background:var(--maroon-dark);padding:56px 4rem;}
   <ul class="nav-links">
     <li><a href="#what">Mission</a></li>
     <li><a href="#demo">Demo</a></li>
+    <li><a href="#architecture">Architecture</a></li>
     <li class="nav-dropdown">
       <a href="#milestones">Milestones ▾</a>
       <div class="nav-dropdown-menu">
@@ -276,7 +311,7 @@ footer{background:var(--maroon-dark);padding:56px 4rem;}
         <a href="milestones/milestone3.html">Milestone 3 — Final Dossier ✦</a>
       </div>
     </li>
-    <li><a href="report/report.html">Report</a></li>
+    <li><a href="report.html">Report</a></li>
     <li><a href="#team">Team</a></li>
     <li><a href="#stats">Stats</a></li>
     <li><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank" class="nav-gh">GitHub ↗</a></li>
@@ -302,7 +337,7 @@ footer{background:var(--maroon-dark);padding:56px 4rem;}
     </div>
     <div class="hero-ctas">
       <a class="btn-pri" href="milestones/milestone3.html">View Final Dossier →</a>
-      <a class="btn-sec" href="report/report.html">Full Project Report</a>
+      <a class="btn-sec" href="report.html">Full Project Report</a>
     </div>
   </div>
   <div class="scroll-hint"><span>Scroll</span><div class="scroll-arr"></div></div>
@@ -417,6 +452,23 @@ footer{background:var(--maroon-dark);padding:56px 4rem;}
   </div>
 </section>
 
+<!-- SYSTEM ARCHITECTURE DIAGRAM -->
+<section id="architecture" style="background:var(--gray-50);padding:120px 4rem;position:relative;">
+  <div class="section-inner">
+    <div class="reveal">
+      <div class="eyebrow-row"><div class="eyebrow-line"></div><span class="eyebrow-txt">System Architecture</span></div>
+      <h2 class="section-h2">The full pipeline,<br/><em>visualised.</em></h2>
+      <p class="section-desc">End-to-end Mermaid diagram of every ROS 2 node, topic, and data flow — from raw sensor input to annotated hazard map output.</p>
+    </div>
+    <div class="reveal" style="margin-top:40px;">
+      <div class="img-zoom-wrap" onclick="openIdxLb('assets/images/mermaid_Final.png')">
+        <img src="assets/images/mermaid_Final.png" alt="Final system architecture Mermaid diagram" style="border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);"/>
+      </div>
+      <p style="margin-top:12px;font-size:13px;color:var(--text-muted);text-align:center;font-family:'JetBrains Mono',monospace;">mermaid_Final.png · Full ROS 2 node &amp; topic graph · Click to zoom</p>
+    </div>
+  </div>
+</section>
+
 <!-- TEAM -->
 <section id="team">
   <div class="section-inner">
@@ -503,7 +555,7 @@ footer{background:var(--maroon-dark);padding:56px 4rem;}
 <footer>
   <div class="footer-inner">
     <div class="f-brand"><div class="logo">Autonomous Frontier Exploration</div><p>An autonomous ground robot that explores unknown environments and maps semantic hazards in real time. Built for RAS 598 Mobile Robotics at Arizona State University.</p></div>
-    <div class="f-col"><h4>Milestones</h4><a href="milestones/milestone1.html">Milestone 1 — Proposal</a><a href="milestones/milestone2.html">Milestone 2 — Technical Proof</a><a href="milestones/milestone3.html">Milestone 3 — Final Dossier</a><a href="report/report.html">Full Project Report</a></div>
+    <div class="f-col"><h4>Milestones</h4><a href="milestones/milestone1.html">Milestone 1 — Proposal</a><a href="milestones/milestone2.html">Milestone 2 — Technical Proof</a><a href="milestones/milestone3.html">Milestone 3 — Final Dossier</a><a href="report.html">Full Project Report</a></div>
     <div class="f-col"><h4>Links</h4><a href="https://github.com/PriColon/mobile-robotics-frontier-exploration" target="_blank">GitHub Repository ↗</a><a href="#team">Meet the Team</a><a href="#stats">Project Stats</a></div>
   </div>
   <div class="f-bottom"><span>RAS 598 Mobile Robotics · Arizona State University · Spring 2026 · Group 1</span><span>Princess Colon · Manjunath Kondamu · Rohit Mane</span></div>
@@ -534,6 +586,85 @@ document.addEventListener('mousemove',e=>{tbX=e.clientX;tbY=e.clientY;});
   tbPrevX+=(tbX-tbPrevX)*0.015;
   tbPrevY+=(tbY-tbPrevY)*0.015;
   requestAnimationFrame(animTb);
+})();
+
+// ── LIGHTBOX with zoom + pan ──
+(function(){
+  const lb=document.getElementById('idx-lb');
+  const viewport=document.getElementById('idx-lb-viewport');
+  const img=document.getElementById('idx-lb-img');
+  const pctLabel=document.getElementById('lb-zoom-pct');
+  const MIN_SCALE=1, MAX_SCALE=6, STEP=0.4;
+  let scale=1, tx=0, ty=0;
+  let dragging=false, startX=0, startY=0, startTx=0, startTy=0;
+
+  function applyTransform(animate){
+    img.style.transition=animate?'transform 0.2s ease':'none';
+    img.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;
+    pctLabel.textContent=Math.round(scale*100)+'%';
+  }
+  function clampPan(){
+    // allow panning only when zoomed in
+    if(scale<=1){tx=0;ty=0;return;}
+    const maxX=(img.naturalWidth*(scale-1))/2;
+    const maxY=(img.naturalHeight*(scale-1))/2;
+    tx=Math.max(-maxX,Math.min(maxX,tx));
+    ty=Math.max(-maxY,Math.min(maxY,ty));
+  }
+  function resetZoom(animate){scale=1;tx=0;ty=0;applyTransform(animate);}
+  function open(src){
+    img.src=src;
+    resetZoom(false);
+    lb.classList.add('active');
+    document.body.style.overflow='hidden';
+  }
+  function close(){lb.classList.remove('active');document.body.style.overflow='';}
+
+  // expose open globally so the img-zoom-wrap onclick can call it
+  window.openIdxLb=open;
+
+  document.getElementById('idx-lb-close').addEventListener('click',close);
+  document.getElementById('lb-zoom-reset').addEventListener('click',()=>resetZoom(true));
+  document.getElementById('lb-zoom-in').addEventListener('click',()=>{
+    scale=Math.min(MAX_SCALE,scale+STEP);clampPan();applyTransform(true);
+  });
+  document.getElementById('lb-zoom-out').addEventListener('click',()=>{
+    scale=Math.max(MIN_SCALE,scale-STEP);clampPan();applyTransform(true);
+  });
+
+  // scroll wheel zoom
+  viewport.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const delta=e.deltaY<0?STEP:-STEP;
+    scale=Math.max(MIN_SCALE,Math.min(MAX_SCALE,scale+delta));
+    clampPan();applyTransform(false);
+  },{passive:false});
+
+  // drag to pan
+  viewport.addEventListener('mousedown',e=>{
+    if(scale<=1)return;
+    dragging=true;startX=e.clientX;startY=e.clientY;startTx=tx;startTy=ty;
+    viewport.classList.add('dragging');
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    tx=startTx+(e.clientX-startX);
+    ty=startTy+(e.clientY-startY);
+    clampPan();applyTransform(false);
+  });
+  window.addEventListener('mouseup',()=>{dragging=false;viewport.classList.remove('dragging');});
+
+  // click backdrop to close
+  viewport.addEventListener('click',e=>{if(!dragging&&scale<=1)close();});
+
+  // keyboard
+  document.addEventListener('keydown',e=>{
+    if(!lb.classList.contains('active'))return;
+    if(e.key==='Escape')close();
+    if(e.key==='+'||e.key==='='){scale=Math.min(MAX_SCALE,scale+STEP);clampPan();applyTransform(true);}
+    if(e.key==='-'){scale=Math.max(MIN_SCALE,scale-STEP);clampPan();applyTransform(true);}
+    if(e.key==='0')resetZoom(true);
+  });
 })();
 
 // ── NAV SCROLL ──

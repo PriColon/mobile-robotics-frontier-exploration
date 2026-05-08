@@ -333,7 +333,18 @@ body{cursor:none;}
       linear-gradient(rgba(140,29,64,0.04) 1px, transparent 1px),
       linear-gradient(90deg, rgba(140,29,64,0.04) 1px, transparent 1px);
     background-size:28px 28px;}
-/* KaTeX overflow fix */
+/* ── GRAPHICAL ABSTRACT FULLSCREEN ── */
+.ga-fs-btn{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:8px 18px;background:var(--maroon);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:background 0.2s;}
+.ga-fs-btn:hover{background:#6B1530;}
+.ga-fs-btn svg{flex-shrink:0;}
+.ga-fullscreen-overlay{display:none;position:fixed;inset:0;z-index:99999;background:#f9f9f9;overflow-y:auto;}
+.ga-fullscreen-overlay.active{display:block;}
+.ga-fs-topbar{position:sticky;top:0;z-index:10;background:rgba(140,29,64,0.97);backdrop-filter:blur(12px);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #FFC627;}
+.ga-fs-topbar span{color:rgba(255,255,255,0.9);font-size:14px;font-weight:600;}
+.ga-fs-back{display:inline-flex;align-items:center;gap:8px;background:#FFC627;color:#6B1530;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.2s;}
+.ga-fs-back:hover{background:#FFD966;}
+.ga-fs-content{max-width:1400px;margin:0 auto;padding:40px 48px 60px;}
+.ga-fs-content .ga-new-wrap{margin:0;}
 .katex-display{overflow-x:auto;overflow-y:hidden;max-width:100%;}
 .ga-flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin-bottom:16px;}
 .ga-step{flex:1;min-width:100px;background:white;border:1px solid var(--border);border-radius:8px;padding:14px 10px;text-align:center;transition:all 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
@@ -591,7 +602,11 @@ body{cursor:none;}
 
         </div>
       </div>
-      <p style="font-size:12px;color:var(--muted);font-style:italic;margin-bottom:20px;">Fig. A — Graphical Abstract · RAS 598 · ASU · Spring 2026</p>
+      <p style="font-size:12px;color:var(--muted);font-style:italic;margin-bottom:12px;">Fig. A — Graphical Abstract · RAS 598 · ASU · Spring 2026</p>
+      <button class="ga-fs-btn" onclick="openGaFs()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1h4M1 1v4M13 1h-4M13 1v4M1 13h4M1 13v-4M13 13h-4M13 13v-4" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+        View Fullscreen
+      </button>
 
       <p>The system pipeline processes sensor data through five sequential layers, each communicating over standard ROS 2 topics:</p>
       <ul style="padding-left:20px;line-height:2.2;font-size:16px;">
@@ -978,6 +993,39 @@ function toggleE(btn){
 }
 const obs2=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting)x.target.classList.add('visible');});},{threshold:0.06});
 document.querySelectorAll('.fade-in').forEach(el=>obs2.observe(el));
+</script>
+<!-- GRAPHICAL ABSTRACT FULLSCREEN OVERLAY -->
+<div class="ga-fullscreen-overlay" id="ga-fs-overlay">
+  <div class="ga-fs-topbar">
+    <span>Graphical Abstract — Autonomous Frontier Exploration · RAS 598 · ASU Spring 2026</span>
+    <button class="ga-fs-back" onclick="closeGaFs()">
+      ← Back
+    </button>
+  </div>
+  <div class="ga-fs-content" id="ga-fs-content">
+    <!-- content cloned here by JS -->
+  </div>
+</div>
+
+<script>
+function openGaFs(){
+  const overlay=document.getElementById('ga-fs-overlay');
+  const content=document.getElementById('ga-fs-content');
+  // clone the graphical abstract wrap into the overlay
+  const src=document.querySelector('.ga-new-wrap');
+  content.innerHTML='';
+  content.appendChild(src.cloneNode(true));
+  overlay.classList.add('active');
+  document.body.style.overflow='hidden';
+  window.scrollTo(0,0);
+}
+function closeGaFs(){
+  document.getElementById('ga-fs-overlay').classList.remove('active');
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape')closeGaFs();
+});
 </script>
 </body>
 </html>
