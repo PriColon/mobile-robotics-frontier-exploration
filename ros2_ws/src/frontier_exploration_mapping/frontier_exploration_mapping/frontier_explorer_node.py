@@ -91,7 +91,7 @@ def score_clusters(
         unknown_near = int(np.sum(grid[r_min:r_max, c_min:c_max] == -1))
 
         dist  = np.sqrt((cr - robot_row) ** 2 + (cc - robot_col) ** 2) * resolution
-        score = (alpha * size + beta * unknown_near) / (dist + epsilon)
+        score = 1.0 / (dist + epsilon)  # nearest frontier first (wavefront)
 
         scored.append({
             **cluster,

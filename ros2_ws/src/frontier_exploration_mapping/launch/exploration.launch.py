@@ -23,6 +23,15 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_rviz     = LaunchConfiguration('use_rviz')
 
+    # ── Scan Relay (fixes sim frame_id issue) ─────────────────────────────
+    scan_relay_node = Node(
+        package    = 'frontier_exploration_mapping',
+        executable = 'scan_relay_node',
+        name       = 'scan_relay',
+        output     = 'screen',
+        parameters = [{'use_sim_time': use_sim_time}],
+    )
+
     # ── SLAM ──────────────────────────────────────────────────────────────
     slam_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -34,6 +43,10 @@ def generate_launch_description():
         ]),
         launch_arguments={
             'use_sim_time': use_sim_time,
+            'params': PathJoinSubstitution([
+                FindPackageShare('frontier_exploration_mapping'),
+                'slam_sim.yaml'
+            ]),
         }.items(),
     )
 
@@ -93,6 +106,7 @@ def generate_launch_description():
         use_sim_time_arg,
         use_rviz_arg,
 
+        scan_relay_node,
         slam_launch,
         navigation_planner_node,
         frontier_explorer_node,

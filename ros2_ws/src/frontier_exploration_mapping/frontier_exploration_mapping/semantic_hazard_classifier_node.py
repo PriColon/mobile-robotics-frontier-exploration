@@ -38,475 +38,344 @@ import traceback
 import os
 import queue
 import math
-
 import rclpy
-import rclpy.executors
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
-from rclpy.time import Time as RosTime
+from rclpy.action import ActionClient
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 
-import numpy as np
-import cv2
-
-from cv_bridge import CvBridge
-from ament_index_python.packages import get_package_share_directory
+from geometry_msgs.msg import PoseArray
+from sensor_msgs.msg import BatteryState
+from std_msgs.msg import Bool
+from nav2_msgs.action import NavigateToPose
 
 import tf2_ros
-
-from sensor_msgs.msg import CompressedImage, Image
-from std_msgs.msg import Bool, String
-from visualization_msgs.msg import Marker, MarkerArray
-from geometry_msgs.msg import Point
+from tf2_ros import TransformException
 
 try:
-    from irobot_create_msgs.msg import HazardDetectionVector, SlipStatus
-    CREATE3_AVAILABLE = True
+    from irobot_create_msgs.msg import HazardDetectionVector, HazardDetection
+    HAZARD_AVAILABLE = True
 except ImportError:
-    CREATE3_AVAILABLE = False
-
-HAZMAT_AVAILABLE = False
-_hazmat_import_error = None
-try:
-    from frontier_exploration_mapping.deep_hazmat import DeepHAZMAT
-    HAZMAT_AVAILABLE = True
-except Exception:
-    _hazmat_import_error = traceback.format_exc()
+    HAZARD_AVAILABLE = False
 
 
-# ── Tunable constants ────────────────────────────────────────────────────────
+FRONTIER_TIMEOUT           = 5.0
+BATTERY_LOW_PCT            = 15.0
+MAX_GOAL_FAILURES          = 3
 
-YOLO_INTERVAL_SEC     = 1.0   # minimum gap between YOLO runs
-WORKER_IDLE_SLEEP_SEC = 0.1   # sleep when nothing to do
-JPEG_QUALITY          = 75    # raw→compressed conversion quality
-TF_BUFFER_SEC         = 10.0  # how long tf2 keeps history (default is fine)
-TF_TIMEOUT_SEC        = 0.5   # how long to wait for a tf lookup
-LOC_QUEUE_MAX         = 20    # max pending localization jobs
+PROXIMITY_LOCK_RADIUS      = 1.0
+FRONTIER_SIMILARITY_RADIUS = 0.50
 
 
-class SemanticHazardClassifier(Node):
+class State:
+    IDLE       = 'IDLE'
+    SELECTING  = 'SELECTING'
+    PENDING    = 'PENDING'
+    NAVIGATING = 'NAVIGATING'
+    ARRIVED    = 'ARRIVED'
+    DONE       = 'DONE'
+
+
+class BehaviorCoordinator(Node):
 
     def __init__(self):
-        super().__init__('semantic_hazard_classifier')
+        super().__init__('behavior_coordinator')
 
-        self.declare_parameter('hazmat_confidence',  0.5)
-        self.declare_parameter('yolo_width',         320)
-        self.declare_parameter('yolo_interval_sec',  YOLO_INTERVAL_SEC)
+        self._cb_group = ReentrantCallbackGroup()
 
-        hazmat_confidence   = self.get_parameter('hazmat_confidence').value
-        self._yolo_width    = self.get_parameter('yolo_width').value
-        self._yolo_interval = self.get_parameter('yolo_interval_sec').value
+        self.state            = State.SELECTING
+        self.frontier_goals   = []
+        self.visited_set      = set()
+        self.failure_counts   = {}
+        self.original_goal_xy = None
+        self.current_goal_xy  = None
+        self.last_frontier_t  = None
+        self.nav_goal_handle  = None
+        self.robot_pose       = None
 
-        self.bridge = CvBridge()
-
-        # ── Shared state ─────────────────────────────────────────────────
-        self._pending_frame:    bytes | None = None
-        self._pending_stamp:    object       = None   # ROS stamp from msg.header
-
-        self._result_lock     = threading.Lock()
-        self._last_detections = []
-        self._last_yolo_time  = 0.0
-
-        # ── tf2 buffer — receives /tf and /tf_static on the main executor ─
-        self._tf_buffer   = tf2_ros.Buffer(cache_time=rclpy.duration.Duration(seconds=TF_BUFFER_SEC))
+        self._tf_buffer   = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
+        self.create_timer(0.05, self._tf_pose_timer, callback_group=self._cb_group)
 
-        # ── Localization job queue ────────────────────────────────────────
-        # Each item: {'stamp': ROS stamp, 'detections': [...], 'frame_id': str}
-        self._loc_queue = queue.Queue(maxsize=LOC_QUEUE_MAX)
+        self.create_subscription(
+            PoseArray,    '/frontier_goals',   self._frontiers_cb, 10,
+            callback_group=self._cb_group)
+        self.create_subscription(
+            BatteryState, '/battery_state',    self._battery_cb,   10,
+            callback_group=self._cb_group)
+        self.create_subscription(
+            Bool,         '/exploration/stop', self._kill_cb,      10,
+            callback_group=self._cb_group)
 
-        # Accumulated map-frame HAZMAT markers
-        self._map_markers: list[Marker] = []
-        self._map_marker_lock = threading.Lock()
-        self._next_map_marker_id = 0
-
-        # ── DeepHAZMAT ────────────────────────────────────────────────────
-        self._hazmat = None
-        if HAZMAT_AVAILABLE:
-            try:
-                pkg_share = get_package_share_directory('frontier_exploration_mapping')
-                net_dir   = os.path.join(pkg_share, 'net')
-                for fname in ('yolo.cfg', 'yolo.weights', 'labels.names'):
-                    fpath = os.path.join(net_dir, fname)
-                    if not os.path.exists(fpath):
-                        raise FileNotFoundError(f'Missing YOLO file: {fpath}')
-                self._hazmat = DeepHAZMAT(
-                    k=0,
-                    net_directory=net_dir,
-                    min_confidence=hazmat_confidence,
-                    nms_threshold=0.3,
-                    segmentation_enabled=False,
-                )
-                self.get_logger().info(
-                    f'DeepHAZMAT loaded '
-                    f'(yolo_width={self._yolo_width}, '
-                    f'interval={self._yolo_interval:.1f}s).')
-            except Exception as e:
-                self.get_logger().error(
-                    f'DeepHAZMAT failed to load: {e}\n{traceback.format_exc()}')
-        else:
-            self.get_logger().error(
-                f'DeepHAZMAT import failed:\n{_hazmat_import_error}')
-
-        # ── Image helper node (YOLO thread only) ─────────────────────────
-        sensor_qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            durability=DurabilityPolicy.VOLATILE,
-            depth=1,
-        )
-        self._image_node = rclpy.create_node('hazmat_image_helper')
-        self._image_node.create_subscription(
-            CompressedImage,
-            '/oakd/rgb/preview/image_raw/compressed',
-            self._compressed_cb,
-            sensor_qos,
-        )
-        self._image_node.create_subscription(
-            Image,
-            '/oakd/rgb/preview/image_raw',
-            self._raw_cb,
-            sensor_qos,
-        )
-        self._image_executor = rclpy.executors.SingleThreadedExecutor()
-        self._image_executor.add_node(self._image_node)
-
-        # ── Background threads ────────────────────────────────────────────
-        self._yolo_thread = threading.Thread(
-            target=self._yolo_worker, daemon=True, name='yolo_worker')
-        self._loc_thread  = threading.Thread(
-            target=self._localization_worker, daemon=True, name='loc_worker')
-        self._yolo_thread.start()
-        self._loc_thread.start()
-
-        # ── Main-node subscribers ─────────────────────────────────────────
-        if CREATE3_AVAILABLE:
+        if HAZARD_AVAILABLE:
             self.create_subscription(
-                HazardDetectionVector, '/hazard_detection',
-                self._hw_hazard_cb, 10)
-            self.create_subscription(
-                SlipStatus, '/slip_status',
-                self._slip_cb, 10)
+                HazardDetectionVector, '/hazard_detection', self._hazard_cb, 10,
+                callback_group=self._cb_group)
 
-        # ── Publishers ────────────────────────────────────────────────────
-        self.alert_pub      = self.create_publisher(String,      '/hazard_alert',       10)
-        self.stop_pub       = self.create_publisher(Bool,        '/exploration/stop',    10)
-        self.marker_pub     = self.create_publisher(MarkerArray, '/hazard_markers',      10)
-        self.map_marker_pub = self.create_publisher(MarkerArray, '/hazmat_map_markers',  10)
+        self._nav_client = ActionClient(
+            self, NavigateToPose, '/navigate_to_pose',
+            callback_group=self._cb_group)
 
-        # 5 Hz heartbeat — keeps RViz2 markers alive between YOLO cycles
-        self.create_timer(0.2, self._heartbeat)
+        self.create_timer(0.5, self._loop,     callback_group=self._cb_group)
+        self.create_timer(1.0, self._watchdog, callback_group=self._cb_group)
 
-        self.get_logger().info(
-            f'Semantic Hazard Classifier started.  '
-            f'interval={self._yolo_interval:.1f}s  width={self._yolo_width}px\n'
-            f'  Retroactive localization: ENABLED  '
-            f'(tf buffer={TF_BUFFER_SEC:.0f}s)')
+        # Bootstrap: publish cmd_vel to spin robot until first frontiers appear
+        self._bootstrap_done = False
+        self._cmd_vel_pub = self.create_publisher(
+            __import__('geometry_msgs.msg', fromlist=['TwistStamped']).TwistStamped,
+            '/cmd_vel', 10)
+        self.create_timer(0.1, self._bootstrap_spin, callback_group=self._cb_group)
 
-    # ── Image callbacks (YOLO thread) ──────────────────────────────────────
+        self.get_logger().info('BehaviorCoordinator started — waiting for frontiers...')
 
-    def _compressed_cb(self, msg: CompressedImage):
-        self._pending_frame = bytes(msg.data)
-        self._pending_stamp = msg.header.stamp      # hardware capture time
+    def _bootstrap_spin(self):
+        """Spin robot in place until first frontiers are detected."""
+        if self._bootstrap_done:
+            return
+        if self.frontier_goals:
+            self._bootstrap_done = True
+            self.get_logger().info('Frontiers found — bootstrap complete.')
+            return
+        from geometry_msgs.msg import TwistStamped
+        msg = TwistStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.twist.angular.z = 0.5
+        self._cmd_vel_pub.publish(msg)
 
-    def _raw_cb(self, msg: Image):
+    def _tf_pose_timer(self):
         try:
-            frame = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
-            ok, buf = cv2.imencode(
-                '.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
-            if ok:
-                self._pending_frame = buf.tobytes()
-                self._pending_stamp = msg.header.stamp
-        except Exception as e:
-            print(f'[image helper] raw decode error: {e}')
+            tf = self._tf_buffer.lookup_transform(
+                'map', 'base_link',
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.05))
+        except TransformException:
+            return
+        self.robot_pose = (tf.transform.translation.x, tf.transform.translation.y)
 
-    def _hw_hazard_cb(self, msg): pass
-    def _slip_cb(self,     msg): pass
+    def _loop(self):
+        if self.state == State.DONE:
+            return
+        if self.state in (State.IDLE, State.SELECTING, State.ARRIVED):
+            self._try_select_and_send()
 
-    # ── YOLO worker ────────────────────────────────────────────────────────
+    def _find_similar_frontier(self, anchor_xy, radius):
+        ax, ay = anchor_xy
+        best, best_d = None, float('inf')
+        for x, y in self.frontier_goals:
+            if self._round_key(x, y) in self.visited_set:
+                continue
+            d = math.hypot(x - ax, y - ay)
+            if d <= radius and d < best_d:
+                best, best_d = (x, y), d
+        return best
 
-    def _yolo_worker(self):
-        try:
-            from imutils import resize as imutils_resize
-        except ImportError:
-            self.get_logger().error('[YOLO] imutils not installed — thread exiting.')
+    def _dist_to_anchor(self):
+        if self.robot_pose is None or self.original_goal_xy is None:
+            return None
+        rx, ry = self.robot_pose
+        gx, gy = self.original_goal_xy
+        return math.hypot(gx - rx, gy - ry)
+
+    def _try_select_and_send(self):
+        if self.state in (State.PENDING, State.NAVIGATING):
+            return
+        if not self.frontier_goals:
             return
 
-        self.get_logger().info('[YOLO] worker started.')
+        chosen = None
+        for x, y in self.frontier_goals:
+            if self._round_key(x, y) not in self.visited_set:
+                chosen = (x, y)
+                break
 
-        while rclpy.ok():
-            # Drain image subscriber queue (non-blocking)
-            self._image_executor.spin_once(timeout_sec=0.0)
+        if chosen is None:
+            self.get_logger().info('All known frontiers visited — exploration DONE.')
+            self.state = State.DONE
+            return
 
-            # Cooldown
-            if time.monotonic() - self._last_yolo_time < self._yolo_interval:
-                time.sleep(WORKER_IDLE_SLEEP_SEC)
-                continue
+        self.original_goal_xy = chosen
+        self.current_goal_xy  = chosen
+        self._send_nav_goal(*chosen)
 
-            # Grab latest frame + its hardware timestamp
-            data  = self._pending_frame
-            stamp = self._pending_stamp
-            if data is None or self._hazmat is None:
-                time.sleep(WORKER_IDLE_SLEEP_SEC)
-                continue
-            self._pending_frame = None
+    def _send_nav_goal(self, gx: float, gy: float):
+        if not self._nav_client.wait_for_server(timeout_sec=3.0):
+            self.get_logger().warn('Navigator not available — staying in SELECTING.')
+            return
 
-            # Clear stale result immediately
-            with self._result_lock:
-                self._last_detections = []
+        goal_msg = NavigateToPose.Goal()
+        goal_msg.pose.header.frame_id    = 'map'
+        goal_msg.pose.header.stamp       = self.get_clock().now().to_msg()
+        goal_msg.pose.pose.position.x    = gx
+        goal_msg.pose.pose.position.y    = gy
+        goal_msg.pose.pose.orientation.w = 1.0
 
-            # Decode → resize
-            arr   = np.frombuffer(data, dtype=np.uint8)
-            frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            if frame is None:
-                time.sleep(WORKER_IDLE_SLEEP_SEC)
-                continue
-            small = imutils_resize(frame, width=self._yolo_width)
+        self.get_logger().info(
+            f'[{self.state}] → PENDING  '
+            f'anchor=({self.original_goal_xy[0]:.2f},{self.original_goal_xy[1]:.2f})  '
+            f'nav_goal=({gx:.2f},{gy:.2f})')
 
-            # Inference
-            try:
-                results    = self._hazmat.update(small)
-                detections = list(results) if results else []
-            except Exception as e:
-                detections = []
-                self.get_logger().error(f'[YOLO] inference error: {e}')
+        self.state = State.PENDING
 
-            # Store + publish immediately
-            with self._result_lock:
-                self._last_detections = detections
-            self._publish_current(detections)
+        future = self._nav_client.send_goal_async(
+            goal_msg, feedback_callback=self._feedback_cb)
+        future.add_done_callback(self._goal_accepted_cb)
 
-            if detections:
-                self.get_logger().info(
-                    f'[YOLO] {len(detections)} detection(s) — '
-                    f'queuing retroactive localization')
-                # Push localization job (non-blocking — drop if queue full)
-                try:
-                    self._loc_queue.put_nowait({
-                        'stamp':      stamp,
-                        'detections': detections,
-                        'frame_id':   'base_link',
-                    })
-                except queue.Full:
-                    self.get_logger().warn('[YOLO] localization queue full — dropping job')
+    def _goal_accepted_cb(self, future):
+        handle = future.result()
+        if not handle.accepted:
+            self.get_logger().warn('Goal rejected — back to SELECTING.')
+            self.state = State.SELECTING
+            return
 
-            self._last_yolo_time = time.monotonic()
-            time.sleep(WORKER_IDLE_SLEEP_SEC)
+        self.get_logger().info(
+            f'Goal accepted — NAVIGATING to '
+            f'({self.current_goal_xy[0]:.2f},{self.current_goal_xy[1]:.2f})')
+        self.state = State.NAVIGATING
+        self.nav_goal_handle = handle
+        handle.get_result_async().add_done_callback(self._result_cb)
 
-    # ── Localization worker ────────────────────────────────────────────────
-    #
-    # Pops detection jobs off the queue, looks up the robot's map-frame pose
-    # at the hardware capture timestamp, then projects a fixed distance
-    # forward along the robot's heading to estimate where the HAZMAT is on
-    # the wall directly in front of the camera.
-    #
-    # Proof-of-concept approximation
-    # ───────────────────────────────
-    #   marker_x = robot_x + PROJECTION_DIST * cos(yaw)
-    #   marker_y = robot_y + PROJECTION_DIST * sin(yaw)
-    #
-    # yaw is extracted from the quaternion returned by tf2.  The projection
-    # distance is tunable via HAZMAT_PROJECTION_DIST_M.  Future refinement
-    # can replace this with a proper ray-cast using the detection's bounding
-    # box centre and the camera's known FOV.
+    def _feedback_cb(self, feedback_msg):
+        self.get_logger().debug(
+            f'Distance remaining: {feedback_msg.feedback.distance_remaining:.2f} m')
 
-    # How far in front of the robot to place the wall marker (metres).
-    # At 0.2 m/s the robot is never closer than ~0.3 m to a wall before
-    # Nav2 stops it, so 1.0 m is a reasonable mid-field guess.
-    HAZMAT_PROJECTION_DIST_M = 1.0
+    def _result_cb(self, future):
+        from action_msgs.msg import GoalStatus
+        status = future.result().status
 
-    def _localization_worker(self):
-        self.get_logger().info('[LOC] worker started.')
-
-        while rclpy.ok():
-            try:
-                job = self._loc_queue.get(timeout=1.0)
-            except queue.Empty:
-                continue
-
-            stamp      = job['stamp']
-            detections = job['detections']
-
-            if stamp is None:
-                self.get_logger().warn('[LOC] job has no timestamp — skipping')
-                continue
-
-            # Convert ROS stamp to rclpy Time for tf2
-            ros_time = RosTime(
-                seconds=stamp.sec,
-                nanoseconds=stamp.nanosec,
-                clock_type=self.get_clock().clock_type,
-            )
-
-            try:
-                transform = self._tf_buffer.lookup_transform(
-                    target_frame='map',
-                    source_frame='base_link',
-                    time=ros_time,
-                    timeout=rclpy.duration.Duration(seconds=TF_TIMEOUT_SEC),
-                )
-            except (tf2_ros.LookupException,
-                    tf2_ros.ConnectivityException,
-                    tf2_ros.ExtrapolationException) as e:
-                self.get_logger().warn(f'[LOC] tf lookup failed: {e}')
-                continue
-
-            # Robot position in map
-            rx = transform.transform.translation.x
-            ry = transform.transform.translation.y
-
-            # Extract yaw from quaternion (z-axis rotation only — 2D map)
-            qx = transform.transform.rotation.x
-            qy = transform.transform.rotation.y
-            qz = transform.transform.rotation.z
-            qw = transform.transform.rotation.w
-            yaw = 2.0 * math.atan2(qz, qw)   # standard 2D yaw extraction
-
-            # Project forward along the robot's heading
-            d  = self.HAZMAT_PROJECTION_DIST_M
-            mx = rx + d * math.cos(yaw)
-            my = ry + d * math.sin(yaw)
-
+        if status == GoalStatus.STATUS_SUCCEEDED:
+            key = self._round_key(*self.original_goal_xy)
             self.get_logger().info(
-                f'[LOC] robot ({rx:.2f}, {ry:.2f}) yaw={math.degrees(yaw):.1f}° '
-                f'→ HAZMAT projected to ({mx:.2f}, {my:.2f})  '
-                f'classes: {[det.name for det in detections]}')
+                f'Arrived at anchor ({self.original_goal_xy[0]:.2f},'
+                f'{self.original_goal_xy[1]:.2f})')
+            self.visited_set.add(key)
+            self.failure_counts.pop(key, None)
+            self.state = State.SELECTING
 
-            # Build persistent markers — one cylinder + one text label per detection
-            now_stamp = self.get_clock().now().to_msg()
-            with self._map_marker_lock:
-                for det in detections:
-                    # ── Cylinder marker ──────────────────────────────────
-                    cyl                    = Marker()
-                    cyl.header.frame_id    = 'map'
-                    cyl.header.stamp       = now_stamp
-                    cyl.ns                 = 'hazmat_locations'
-                    cyl.id                 = self._next_map_marker_id
-                    self._next_map_marker_id += 1
-                    cyl.type               = Marker.CYLINDER
-                    cyl.action             = Marker.ADD
-                    cyl.pose.position.x    = mx
-                    cyl.pose.position.y    = my
-                    cyl.pose.position.z    = 0.5
-                    cyl.pose.orientation.w = 1.0
-                    cyl.scale.x            = 0.4
-                    cyl.scale.y            = 0.4
-                    cyl.scale.z            = 1.0
-                    cyl.color.r            = 1.0
-                    cyl.color.g            = 0.5
-                    cyl.color.b            = 0.0
-                    cyl.color.a            = 0.9
-                    cyl.lifetime.sec       = 0   # persistent
-                    self._map_markers.append(cyl)
-
-                    # ── Text label above the cylinder ────────────────────
-                    txt                    = Marker()
-                    txt.header.frame_id    = 'map'
-                    txt.header.stamp       = now_stamp
-                    txt.ns                 = 'hazmat_labels'
-                    txt.id                 = self._next_map_marker_id
-                    self._next_map_marker_id += 1
-                    txt.type               = Marker.TEXT_VIEW_FACING
-                    txt.action             = Marker.ADD
-                    txt.pose.position.x    = mx
-                    txt.pose.position.y    = my
-                    txt.pose.position.z    = 1.2   # above the cylinder
-                    txt.pose.orientation.w = 1.0
-                    txt.scale.z            = 0.25  # text height in metres
-                    txt.color.r            = 1.0
-                    txt.color.g            = 1.0
-                    txt.color.b            = 1.0
-                    txt.color.a            = 1.0
-                    txt.text               = det.name.upper()
-                    txt.lifetime.sec       = 0
-                    self._map_markers.append(txt)
-
-                ma = MarkerArray()
-                ma.markers = list(self._map_markers)
-
-            self.map_marker_pub.publish(ma)
-
-    # ── Transient detection publish ────────────────────────────────────────
-
-    def _publish_current(self, detections):
-        """Publish the current frame's detection state immediately."""
-        stamp = self.get_clock().now().to_msg()
-        ma    = MarkerArray()
-
-        if detections:
-            for det in detections:
-                self.get_logger().info(
-                    f'HAZMAT detected: {det}',
-                    throttle_duration_sec=1.0)
-
-            alert      = String()
-            alert.data = 'HAZMAT'
-            self.alert_pub.publish(alert)
-
-            m                    = Marker()
-            m.header.frame_id    = 'base_link'
-            m.header.stamp       = stamp
-            m.ns                 = 'hazmat_current'
-            m.id                 = 0
-            m.type               = Marker.CYLINDER
-            m.action             = Marker.ADD
-            m.pose.position.z    = 0.5
-            m.pose.orientation.w = 1.0
-            m.scale.x = m.scale.y = 0.3
-            m.scale.z            = 1.0
-            m.color.r            = 1.0
-            m.color.g            = 0.0
-            m.color.b            = 1.0
-            m.color.a            = 0.85
-            m.lifetime.sec       = 2
-            ma.markers.append(m)
+        elif status == GoalStatus.STATUS_CANCELED:
+            self.get_logger().info('Goal cancelled.')
+            self.state = State.SELECTING
 
         else:
-            alert      = String()
-            alert.data = 'CLEAR'
-            self.alert_pub.publish(alert)
+            key = self._round_key(*self.original_goal_xy)
+            self.failure_counts[key] = self.failure_counts.get(key, 0) + 1
+            count = self.failure_counts[key]
+            self.get_logger().warn(
+                f'Goal failed (status={status}) — '
+                f'failure {count}/{MAX_GOAL_FAILURES} for anchor {key}')
+            if count >= MAX_GOAL_FAILURES:
+                self.get_logger().warn(f'Blacklisting anchor {key}.')
+                self.visited_set.add(key)
+                self.failure_counts.pop(key, None)
+            self.state = State.SELECTING
 
-            clear        = Marker()
-            clear.ns     = 'hazmat_current'
-            clear.action = Marker.DELETEALL
-            ma.markers.append(clear)
+    def _frontiers_cb(self, msg: PoseArray):
+        self.last_frontier_t = self.get_clock().now()
+        self.frontier_goals  = [(p.position.x, p.position.y) for p in msg.poses]
 
-        self.marker_pub.publish(ma)
+        if self.state not in (State.NAVIGATING, State.PENDING):
+            if self.state in (State.IDLE, State.SELECTING):
+                self._try_select_and_send()
+            return
 
-    # ── Heartbeat timer (main executor) ───────────────────────────────────
+        if self.state == State.PENDING:
+            return
 
-    def _heartbeat(self):
-        """Re-publish current state and accumulated map markers to keep RViz2 alive."""
-        with self._result_lock:
-            detections = list(self._last_detections)
-        self._publish_current(detections)
+        if self.original_goal_xy is None:
+            return
 
-        # Re-publish persistent map markers so RViz2 doesn't time them out
-        with self._map_marker_lock:
-            if self._map_markers:
-                ma = MarkerArray()
-                ma.markers = list(self._map_markers)
-                self.map_marker_pub.publish(ma)
+        active_key   = self._round_key(*self.current_goal_xy)
+        current_keys = {self._round_key(x, y) for x, y in self.frontier_goals}
 
-    # ── Cleanup ───────────────────────────────────────────────────────────
+        if active_key in current_keys:
+            return
 
-    def destroy_node(self):
-        self._image_executor.shutdown()
-        self._image_node.destroy_node()
-        super().destroy_node()
+        similar = self._find_similar_frontier(
+            self.original_goal_xy, FRONTIER_SIMILARITY_RADIUS)
+
+        if similar is not None:
+            old = self.current_goal_xy
+            self.current_goal_xy = similar
+            self.get_logger().info(
+                f'Frontier drifted: ({old[0]:.2f},{old[1]:.2f}) → '
+                f'({similar[0]:.2f},{similar[1]:.2f})  '
+                f'anchor=({self.original_goal_xy[0]:.2f},{self.original_goal_xy[1]:.2f}) '
+                f'— continuing.')
+            return
+
+        dist = self._dist_to_anchor()
+        dist_str = f'{dist:.2f} m' if dist is not None else 'unknown'
+
+        if dist is not None and dist <= PROXIMITY_LOCK_RADIUS:
+            self.get_logger().info(
+                f'Frontier consumed, robot {dist_str} from anchor '
+                f'(<= {PROXIMITY_LOCK_RADIUS} m) — holding course.')
+        else:
+            self.get_logger().info(
+                f'Frontier consumed, robot {dist_str} from anchor '
+                f'— cancelling and reselecting.')
+            anchor_key = self._round_key(*self.original_goal_xy)
+            self.visited_set.add(anchor_key)
+            self.failure_counts.pop(anchor_key, None)
+            self._cancel_active_goal()
+            self.state = State.SELECTING
+            self._try_select_and_send()
+
+    def _battery_cb(self, msg: BatteryState):
+        pct = msg.percentage * 100.0
+        if pct < BATTERY_LOW_PCT:
+            self.get_logger().warn(f'Battery low ({pct:.1f}%) — stopping.')
+            self._emergency_stop()
+
+    def _hazard_cb(self, msg):
+        if not HAZARD_AVAILABLE:
+            return
+        for det in msg.detections:
+            if det.type in (HazardDetection.BUMP, HazardDetection.CLIFF):
+                self.get_logger().warn('Hazard — cancelling active goal.')
+                self._cancel_active_goal()
+                self.state = State.SELECTING
+                return
+
+    def _kill_cb(self, msg: Bool):
+        if msg.data:
+            self.get_logger().warn('/exploration/stop — shutting down.')
+            self._emergency_stop()
+
+    def _watchdog(self):
+        if self.last_frontier_t is None or self.state == State.DONE:
+            return
+        elapsed = (self.get_clock().now() - self.last_frontier_t).nanoseconds * 1e-9
+        if elapsed > FRONTIER_TIMEOUT and self.state == State.NAVIGATING:
+            self.get_logger().warn(
+                f'No frontier update for {elapsed:.1f} s — reverting to IDLE.')
+            self.state = State.IDLE
+
+    def _cancel_active_goal(self):
+        if self.nav_goal_handle is not None:
+            self.nav_goal_handle.cancel_goal_async()
+            self.nav_goal_handle = None
+
+    def _emergency_stop(self):
+        self._cancel_active_goal()
+        self.state = State.DONE
+
+    @staticmethod
+    def _round_key(x, y, precision=1):
+        return (round(x, precision), round(y, precision))
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = SemanticHazardClassifier()
+    node = BehaviorCoordinator()
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
         node.destroy_node()
-        try:
-            rclpy.shutdown()
-        except Exception:
-            pass
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
