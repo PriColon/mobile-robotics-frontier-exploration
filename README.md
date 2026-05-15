@@ -43,16 +43,17 @@ Semantic Hazard Classifier  — camera → YOLO → hazard location on map (para
 
 ![Gazebo + RViz](assets/images/ss1.png)
 
-**Hazard detection — DeepHAZMAT identifying real signs:**
+**Hazard detection — OXYGEN marker placed on map from real hardware:**
 
-![Oxygen detection 99%](assets/images/ss2.png)
-![Inhalation hazard 98%](assets/images/ss3.png)
-![Flammable 99%](assets/images/ss4.png)
+![Hazard marker on map](assets/images/hazard_ss.png)
 
 Full video demos in `assets/videos/`:
 - `Exploration_Demo.mp4` — complete autonomous run
 - `Frontier_Explorer_Node_Demo.mp4` — frontier detection visualised in RViz
 - `Hazard_Marker_Demo.mp4` — hazard detection with map markers
+
+Full exploration run on YouTube:
+▶ https://youtu.be/9qTa7Z9hum0
 
 ---
 
@@ -66,7 +67,7 @@ Full video demos in `assets/videos/`:
 
 **Semantic Hazard Classifier** stacks three detection layers — DeepHAZMAT for 13 UN hazard classes, YOLOv5 for fire, and LiDAR sector analysis for spatial confirmation. When a detection fires, it does a retroactive TF lookup using the camera frame's capture timestamp to place a persistent marker at the actual hazard location on the map.
 
-> **Note:** Hazard detection works when the camera is facing the sign directly. On the real robot, an OAK-D driver initialisation issue prevented the image stream from connecting reliably — the hazard classifier ran cleanly in simulation.
+> **Note:** Hazard detection worked on real hardware — the screenshot shows the OXYGEN marker placed on the map from an actual sign in the room. Consistent real-time integration is still a work in progress but the core detection pipeline is solid.
 
 ---
 
@@ -82,7 +83,7 @@ Full video demos in `assets/videos/`:
 ## Setup
 
 ```bash
-git clone git@github.com:Mkondamu/mobile-robotics-frontier-exploration.git
+git clone git@github.com:PriColon/mobile-robotics-frontier-exploration.git
 cd mobile-robotics-frontier-exploration/ros2_ws
 colcon build --symlink-install
 ```
